@@ -48,6 +48,43 @@ OPERATION_MODE = 'chemostat' #use to choose between 'turbidostat' and 'chemostat
 def growth_curve(eVOLVER, input_data, vials, elapsed_time):
     return
 
+def growth_curve_stop_stir(eVOLVER, input_data, vials, elapsed_time):
+    
+    last_off = 0
+    last_on = 0
+    newstirrates = []
+
+    for x in vials:
+        file_name =  "vial{0}_stirrate.txt".format(x)
+        stir_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'stirrate', file_name)
+        data = np.genfromtxt(stir_path, delimiter=',')
+        oldstir = data[len(data)-1][2]
+        oldstirtime = data[len(data)-1][1]
+        newstir = None
+        lowstir = 0
+        highstir = 8
+        if ((elapsed_time - oldstirtime)*60) >= STIR_SPACING:
+            if oldstir == lowstir:
+                newstir = highstir
+            else:
+                newstir = lowstir
+            
+            text_file = open(stir_path, "a+")
+            text_file.write("{0},{1},{2}\n".format(elapsed_time,
+                                                   elapsed_time,
+                                                   newstir))
+            text_file.close()
+        else:
+            newstir = oldstir
+            text_file = open(stir_path, "a+")
+            text_file.write("{0},{1},{2}\n".format(elapsed_time,
+                                                   oldstirtime,
+                                                   newstir))
+        newstirrates.append(newstir)
+    newstirrates = [str(d) for d in newstirrates]
+    eVOLVER.update_stir_rate(newstirrates)
+    return
+
 def turbidostat(eVOLVER, input_data, vials, elapsed_time):
     OD_data = input_data['transformed']['od']
 
