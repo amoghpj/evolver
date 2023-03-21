@@ -566,6 +566,8 @@ class EvolverNamespace(BaseNamespace):
             custom_script.chemostat(self, data, vials, elapsed_time)
         elif mode == 'growthcurve':
             custom_script.growth_curve(self, data, vials, elapsed_time)
+        elif mode == 'growth_curve_stop_stir':
+            custom_script.growth_curve_stop_stir(self, data, vials, elapsed_time)        
         else:
             # try to load the user function
             # if failing report to user
