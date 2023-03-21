@@ -42,7 +42,16 @@ STIR_INITIAL = [8,8,8,
 #STIR_INITIAL = [7,7,7,7,8,8,8,8,9,9,9,9,10,10,10,10]
 
 VOLUME =  19 #mL, determined by vial cap straw length
-OPERATION_MODE = 'per_vial_od_calibration' #use to choose between 'turbidostat' and 'chemostat' functions
+
+## Choose one of:
+# 1. growthcurve
+# 2. growth_curve_stop_stir
+# 3. chemostat
+# 4. turbidostat
+# 5. per_vial_od_calibration
+
+OPERATION_MODE = "growth_curve_stop_stir"
+
 # if using a different mode, name your function as the OPERATION_MODE variable
 
 ##### END OF USER DEFINED GENERAL SETTINGS #####
@@ -62,7 +71,10 @@ def growth_curve(eVOLVER, input_data, vials, elapsed_time):
     return
 
 def growth_curve_stop_stir(eVOLVER, input_data, vials, elapsed_time):
-    
+    """
+    Stir bar is turned on for STIR_SPACING minutes and then turned off for the same amount of time
+    """
+    STIR_SPACING = 2
     last_off = 0
     last_on = 0
     newstirrates = []
