@@ -47,6 +47,17 @@ OPERATION_MODE = 'per_vial_od_calibration' #use to choose between 'turbidostat' 
 
 ##### END OF USER DEFINED GENERAL SETTINGS #####
 
+if "sleevecalib" in EXP_NAME:
+    currentcalibs = list(sorted([f for f in os.listdir("./") if EXP_NAME in f]))
+    if len(currentcalibs) > 0:
+        calibnum = max([int(f.split("_")[1]) for f in currentcalibs])
+        newcalib = calibnum + 1
+    else:
+        newcalib = 0
+
+    EXP_NAME = f"{EXP_NAME}_{newcalib}"
+    print(EXP_NAME)    
+
 def growth_curve(eVOLVER, input_data, vials, elapsed_time):
     return
 
@@ -115,7 +126,7 @@ def per_vial_od_calibration(eVOLVER, input_data, vials, elapsed_time):
     odlogs = [os.path.join(eVOLVER.exp_dir, EXP_NAME,
                                             "od_90_raw", f"vial{x}_od_90_raw.txt")
                 for x in vials]    
-    num_pump_events = 17
+    num_pump_events = 26
     for x in vials:
         oddata = pd.read_csv(odlogs[x],
                                sep=",",names=["elapsed_time","od90"],
