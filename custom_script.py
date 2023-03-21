@@ -3,7 +3,9 @@
 import numpy as np
 import logging
 import os.path
+import pandas as pd
 import time
+import sys
 
 # logger setup
 logger = logging.getLogger(__name__)
@@ -13,7 +15,7 @@ logger = logging.getLogger(__name__)
 # If using the GUI for data visualization, do not change EXP_NAME!
 # only change if you wish to have multiple data folders within a single
 # directory for a set of scripts
-EXP_NAME = 'GS203B'
+EXP_NAME = 'XA06B'
 
 # Port for the eVOLVER connection. You should not need to change this unless you have multiple applications on a single RPi.
 EVOLVER_PORT = 8081
@@ -40,7 +42,7 @@ STIR_INITIAL = [8,8,8,
 #STIR_INITIAL = [7,7,7,7,8,8,8,8,9,9,9,9,10,10,10,10]
 
 VOLUME =  19 #mL, determined by vial cap straw length
-OPERATION_MODE = 'chemostat' #use to choose between 'turbidostat' and 'chemostat' functions
+OPERATION_MODE = 'per_vial_od_calibration' #use to choose between 'turbidostat' and 'chemostat' functions
 # if using a different mode, name your function as the OPERATION_MODE variable
 
 ##### END OF USER DEFINED GENERAL SETTINGS #####
@@ -84,6 +86,66 @@ def growth_curve_stop_stir(eVOLVER, input_data, vials, elapsed_time):
     newstirrates = [str(d) for d in newstirrates]
     eVOLVER.update_stir_rate(newstirrates)
     return
+
+def per_vial_od_calibration(eVOLVER, input_data, vials, elapsed_time):
+    volume = 20    
+
+    ## First define pump action.
+    ## Modify this section to increase the dilution size
+
+    bolus = 0.5
+    startOD = 1.0
+    endOD = 0.1
+    numsteps = 10
+    vials_to_run = [1,0,0,0,
+                    0,0,0,0,
+                    0,0,0,0,
+                    0,0,0,0]
+    acquisition_time = 3 ### MINUTES
+    volume_per_step = [3.23*vtr for vtr in vials_to_run]
+    # [volume*(1-(endOD/startOD)**(1/numsteps))
+    # for vial, vtorun in zip(input_vials,vials_to_run)]
+    flow_rate = eVOLVER.get_flow_rate() #read from calibration file
+
+    pump_run_duration = [volume_per_step[x]/flow_rate[x] for x in vials] 
+    MESSAGE = ["--"]*48
+    pumplogs = [os.path.join(eVOLVER.exp_dir, EXP_NAME,
+                                            "pump_log", f"vial{x}_pump_log.txt")
+                for x in vials]
+    odlogs = [os.path.join(eVOLVER.exp_dir, EXP_NAME,
+                                            "od_90_raw", f"vial{x}_od_90_raw.txt")
+                for x in vials]    
+    num_pump_events = 17
+    for x in vials:
+        oddata = pd.read_csv(odlogs[x],
+                               sep=",",names=["elapsed_time","od90"],
+                               skiprows=[0])
+        pumpdata = pd.read_csv(pumplogs[x],
+                               sep=",",names=["elapsed_time","last_pump"],
+                               skiprows=[0])
+        if pumpdata.shape[0] > num_pump_events:
+            print("Ending calibration")
+            sys.exit()
+        last_pump = pumpdata.iloc[-1,0]
+        timein = 0
+        oddata = oddata[oddata.elapsed_time > last_pump]
+        if oddata.shape[0] == 10:
+            timein = round(pump_run_duration[x],2)
+            print(x, timein)
+            MESSAGE[x] = str(timein)
+            MESSAGE[x + 16] = "--"
+            with open(pumplogs[x], "a+") as outfile:
+                outfile.write(f"{elapsed_time},{timein}\n")
+        elif oddata.shape[0] == 9:                
+            MESSAGE[x] = "--"
+            if vials_to_run[x] == 1:
+                MESSAGE[x+16] = str(15)
+            else:
+                MESSAGE[x+16] = "--"
+            
+    if MESSAGE != ["--"]*48:
+        eVOLVER.fluid_command(MESSAGE)
+    
 
 def turbidostat(eVOLVER, input_data, vials, elapsed_time):
     OD_data = input_data['transformed']['od']
