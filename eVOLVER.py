@@ -368,6 +368,7 @@ class EvolverNamespace(BaseNamespace):
 
             logger.debug('creating data directories')
             os.makedirs(os.path.join(EXP_DIR, 'OD'))
+            os.makedirs(os.path.join(EXP_DIR, 'stirrate'))            
             os.makedirs(os.path.join(EXP_DIR, 'temp'))
             os.makedirs(os.path.join(EXP_DIR, 'temp_config'))
             os.makedirs(os.path.join(EXP_DIR, 'pump_log'))
@@ -381,6 +382,13 @@ class EvolverNamespace(BaseNamespace):
                                                            time.strftime("%c"))
                 # make OD file
                 self._create_file(x, 'OD', defaults=[exp_str])
+
+                ## CUSTOM
+                # make stirrate file
+                self._create_file(x, 'stirrate', defaults=["Clock time,time elasped,stir_rate",
+                                                           "{0},{1},{2}".format(0,0,8)])
+                ## CUSTOM                
+                
                 # make temperature data file
                 self._create_file(x, 'temp')
                 # make temperature configuration file
@@ -408,11 +416,11 @@ class EvolverNamespace(BaseNamespace):
 
             stir_rate = STIR_INITIAL
             temp_values = TEMP_INITIAL
-            # if self.experiment_params:
-            #     stir_rate = list(map(lambda x: x['stir'], self.experiment_params['vial_configuration']))
-            #     temp_values = list(map(lambda x: x['temp'], self.experiment_params['vial_configuration']))
+            if self.experiment_params:
+                stir_rate = list(map(lambda x: x['stir'], self.experiment_params['vial_configuration']))
+                temp_values = list(map(lambda x: x['temp'], self.experiment_params['vial_configuration']))
             self.update_stir_rate(stir_rate)
-            # self.update_temperature(temp_values)
+            self.update_temperature(temp_values)
 
             if always_yes:
                 exp_blank = 'y'
@@ -567,7 +575,7 @@ class EvolverNamespace(BaseNamespace):
         elif mode == 'growthcurve':
             custom_script.growth_curve(self, data, vials, elapsed_time)
         elif mode == 'growth_curve_stop_stir':
-            custom_script.growth_curve_stop_stir(self, data, vials, elapsed_time)        
+            custom_script.growth_curve_stop_stir(self, data, vials, elapsed_time)            
         else:
             # try to load the user function
             # if failing report to user
