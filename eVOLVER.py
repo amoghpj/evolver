@@ -10,6 +10,7 @@ import argparse
 import numpy as np
 import json
 import traceback
+import pandas as pd
 from scipy import stats
 from socketIO_client import SocketIO, BaseNamespace
 from nbstreamreader import NonBlockingStreamReader as NBSR
@@ -99,7 +100,7 @@ class EvolverNamespace(BaseNamespace):
                             VIALS, 'OD')
 
             ### Custom
-            self.save_data(data['transformed']['od'], elapsed_time,
+            self.save_data(data['transformed']['od_autocalib'], elapsed_time,
                            VIALS, 'OD_autocalib')
             ### Custom
             self.save_data(data['transformed']['temp'], elapsed_time,
@@ -156,44 +157,49 @@ class EvolverNamespace(BaseNamespace):
         self.emit('getactivecal',
                   {}, namespace = '/dpu-evolver')
         
-    def aj_convertod(self, od90, od135, x, calib):
+    def aj_convertod(self, od90, od135, x):
         try:
-            calib = pd.read_csv(f"{EXP_NAME}-calibration.csv")
+            calib = pd.read_csv(f"{EXP_NAME}-calibration.csv",index_col=0)
         except:
             print("No calibration file found!")
+            sys.exit()
 
         calib = calib.sort_values(by=["vial","time"]).reset_index(drop=True)
         piecewiselinear = lambda x1, x2, y1, y2, x: ((y2 - y1)/(x2 - x1)) * (x - x1) + y1
-
+        
         def getestod(v, calib, sensor):
             ## Linear interpolation for each observation in data
             estod90 = np.nan
             crow = calib.loc[(v < calib.prevreading)\
                             & (v >= calib.reading)\
-                             & (calib.sensor == sensor),
+                             & (calib.sensor == int(sensor))\
+                             & (calib.vial == int(x))\
+                             & (calib.stirrate == 8),
                             [f"estimated_od", f"prevod",
                              f"reading", f"prevreading"
                              ]]
             if crow.shape[0] == 1:
-                return(piecewiselinear(crow[f"reading"],crow[f"prevreading"],
+                transformed = piecewiselinear(crow[f"reading"],crow[f"prevreading"],
                                         crow[f"estimated_od"],crow[f"prevod"],
-                                        v).values[0])
+                                        v).values[0]
+                print(transformed)
+                return(transformed)
             else:
                 return(np.nan)
         # d90 = data["90"].values
         # d135 = data["135"].values
         odinflection = calib.estimated_od_inflection.unique()[0]
-        od_plinear_90 = getestod(v, calib, "90")
+        od_plinear_90 = getestod(od90, calib, "90")
         od_plinear_135 = "NaN"
         if od_plinear_90 < odinflection:
-            od_plinear_135 = getestod(v, calib,  "135")\
+            od_plinear_135 = getestod(od135, calib,  "135")\
         # od_plinear_135 = getestod(v, calib, "90")        
         # data.loc[:, "od_plinear_90"] = [getestod(v, calib, "90")\
         #                                 for v in od90]
         # data.loc[:, "od_plinear_both"] = [getestod(v135, calib,  "135")\
         #                                   if od < odinflection else od\
         #                                   for od,v90, v135 in zip(data.od_plinear_90.values, d90, d135)]
-        return(od_plinear_90, od_plinear_135)
+        return([od_plinear_90, od_plinear_135])
 
     def transform_data(self, data, vials, od_cal, temp_cal):
         od_data_2 = None
@@ -214,8 +220,10 @@ class EvolverNamespace(BaseNamespace):
             return None
 
         od_data = np.array([float(x) for x in od_data])
+
         if od_data_2:
             od_data_2 = np.array([float(x) for x in od_data_2])
+            od_ac_data = np.array([[float(x),float(y)] for x,y in zip(od_data, od_data_2)])        
         temp_data = np.array([float(x) for x in temp_data])
         set_temp_data = np.array([float(x) for x in set_temp_data])
 
@@ -230,7 +238,7 @@ class EvolverNamespace(BaseNamespace):
             temp_coefficients = temp_cal['coefficients'][x]
             ### CUSTOMp
             try:
-                od_ac_data[x] = aj_convertod(od_data[x], od_data_2[x], calib)
+                od_ac_data[x] = self.aj_convertod(od_data[x], od_data_2[x], x)
             except ValueError:
                 print("OD autocalib Error")
                 logger.error('OD autocalib error for vial %d, setting to NaN' % x)
@@ -421,6 +429,7 @@ class EvolverNamespace(BaseNamespace):
 
             logger.debug('creating data directories')
             os.makedirs(os.path.join(EXP_DIR, 'OD'))
+            os.makedirs(os.path.join(EXP_DIR, 'OD_autocalib'))            
             os.makedirs(os.path.join(EXP_DIR, 'stirrate'))            
             os.makedirs(os.path.join(EXP_DIR, 'temp'))
             os.makedirs(os.path.join(EXP_DIR, 'temp_config'))
@@ -442,7 +451,7 @@ class EvolverNamespace(BaseNamespace):
                                                            "{0},{1},{2}".format(0,0,8)])
                 # make stirrate file
                 self._create_file(x, 'OD_autocalib', defaults=["time,od_plinear_90,od_plinear_135"])
-                self._create_file(x, 'growthrate', defaults=[expt_str])                                
+                self._create_file(x, 'growthrate', defaults=[exp_str])                                
                 ## CUSTOM                
                 
                 # make temperature data file

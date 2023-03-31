@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # If using the GUI for data visualization, do not change EXP_NAME!
 # only change if you wish to have multiple data folders within a single
 # directory for a set of scripts
-EXP_NAME = 'XA08-dilute'
+EXP_NAME = 'NC-test'
 
 # Port for the eVOLVER connection. You should not need to change this unless you have multiple applications on a single RPi.
 EVOLVER_PORT = 8081
@@ -51,6 +51,7 @@ VOLUME =  19 #mL, determined by vial cap straw length
 # 5. per_vial_od_calibration
 
 OPERATION_MODE = "per_vial_od_calibration" #"growth_curve_stop_stir"
+OPERATION_MODE = "turbidostat" #"growth_curve_stop_stir"
 
 # if using a different mode, name your function as the OPERATION_MODE variable
 
@@ -201,7 +202,14 @@ def per_vial_od_calibration(eVOLVER, input_data, vials, elapsed_time):
     odlogs = [os.path.join(eVOLVER.exp_dir, EXP_NAME,
                                             "od_90_raw", f"vial{x}_od_90_raw.txt")
                 for x in vials]    
-
+    pumpdata = pd.read_csv(pumplogs[0],
+                           sep=",",names=["elapsed_time","last_pump"],
+                           skiprows=[0])
+    if pumpdata.shape[0] > num_pump_events:
+        print(pumpdata)
+        write_calibration_to_file(startOD, volume, vials)
+        print("Ending calibration")
+        sys.exit()
     for x in vials:
         ## Stir control
         file_name =  "vial{0}_stirrate.txt".format(x)
@@ -338,9 +346,9 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
         # data = eVOLVER.tail_to_np(OD_path, OD_values_to_average)
 
         ## Custom
-        file_name =  "vial{0}_autocalib.txt".format(x)
+        file_name =  "vial{0}_OD_autocalib.txt".format(x)
         ODac_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'OD_autocalib', file_name)
-        data = eVOLVER.tail_to_np(ODac_path, ODac_values_to_average)        
+        data = eVOLVER.tail_to_np(ODac_path, OD_values_to_average)        
         average_OD = 0
 
         # Determine whether turbidostat dilutions are needed

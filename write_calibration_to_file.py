@@ -23,8 +23,8 @@ from tqdm import tqdm
 #         slopes.append(model.coef_[0])
 #         midpoint.append(np.median(time[i:i+winsize]))
 #     return(intercepts, slopes,midpoint)
-
-experiment = "XA09-calib"
+INFLECTION_CORRECTION = 0
+experiment = "NC-calib"
 dflist = []
 vvolumes = [17.64, 17.9, 18.49, 17.49,
               17.86, 17.41, 18.04, 18.16,
@@ -86,4 +86,3 @@ calibdf["prevod"] = calibdf.groupby(["vial","stirrate","sensor"]).estimated_od.s
 calibdf["prevreading"] = calibdf.groupby(["vial","stirrate","sensor"]).reading.shift(1)
 calibdf = calibdf.dropna()
 calibdf.to_csv(f"{experiment}-calibration.csv")
-p
