@@ -310,7 +310,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
     ##### Turbidostat Settings #####
     #Tunable settings for overflow protection, pump scheduling etc. Unlikely to change between expts
 
-    time_out = 8 #(sec) additional amount of time to run efflux pump
+    time_out = 15 #(sec) additional amount of time to run efflux pump
     pump_wait = 3 # (min) minimum amount of time to wait between pump events
 
     ##### End of Turbidostat Settings #####
@@ -333,9 +333,14 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
         ODsettime = data[len(data)-1][0]
         num_curves=len(data)/2;
 
-        file_name =  "vial{0}_OD.txt".format(x)
-        OD_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'OD', file_name)
-        data = eVOLVER.tail_to_np(OD_path, OD_values_to_average)
+        # file_name =  "vial{0}_OD.txt".format(x)
+        # OD_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'OD', file_name)
+        # data = eVOLVER.tail_to_np(OD_path, OD_values_to_average)
+
+        ## Custom
+        file_name =  "vial{0}_autocalib.txt".format(x)
+        ODac_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'OD_autocalib', file_name)
+        data = eVOLVER.tail_to_np(ODac_path, ODac_values_to_average)        
         average_OD = 0
 
         # Determine whether turbidostat dilutions are needed
@@ -344,7 +349,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
         if data.size != 0:
             # Take median to avoid outlier
-            od_values_from_file = data[:,1]
+            od_values_from_file = data[:,1]    # Use only od90 if using ODac
             average_OD = float(np.median(od_values_from_file))
 
             #if recently exceeded upper threshold, note end of growth curve in ODset, allow dilutions to occur and growthrate to be measured
