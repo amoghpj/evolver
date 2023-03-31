@@ -97,6 +97,11 @@ class EvolverNamespace(BaseNamespace):
         try:
             self.save_data(data['transformed']['od'], elapsed_time,
                             VIALS, 'OD')
+
+            ### Custom
+            self.save_data(data['transformed']['od'], elapsed_time,
+                           VIALS, 'OD_autocalib')
+            ### Custom
             self.save_data(data['transformed']['temp'], elapsed_time,
                             VIALS, 'temp')
 
@@ -150,6 +155,45 @@ class EvolverNamespace(BaseNamespace):
         logger.debug('requesting active calibrations')
         self.emit('getactivecal',
                   {}, namespace = '/dpu-evolver')
+        
+    def aj_convertod(self, od90, od135, x, calib):
+        try:
+            calib = pd.read_csv(f"{EXP_NAME}-calibration.csv")
+        except:
+            print("No calibration file found!")
+
+        calib = calib.sort_values(by=["vial","time"]).reset_index(drop=True)
+        piecewiselinear = lambda x1, x2, y1, y2, x: ((y2 - y1)/(x2 - x1)) * (x - x1) + y1
+
+        def getestod(v, calib, sensor):
+            ## Linear interpolation for each observation in data
+            estod90 = np.nan
+            crow = calib.loc[(v < calib.prevreading)\
+                            & (v >= calib.reading)\
+                             & (calib.sensor == sensor),
+                            [f"estimated_od", f"prevod",
+                             f"reading", f"prevreading"
+                             ]]
+            if crow.shape[0] == 1:
+                return(piecewiselinear(crow[f"reading"],crow[f"prevreading"],
+                                        crow[f"estimated_od"],crow[f"prevod"],
+                                        v).values[0])
+            else:
+                return(np.nan)
+        # d90 = data["90"].values
+        # d135 = data["135"].values
+        odinflection = calib.estimated_od_inflection.unique()[0]
+        od_plinear_90 = getestod(v, calib, "90")
+        od_plinear_135 = "NaN"
+        if od_plinear_90 < odinflection:
+            od_plinear_135 = getestod(v, calib,  "135")\
+        # od_plinear_135 = getestod(v, calib, "90")        
+        # data.loc[:, "od_plinear_90"] = [getestod(v, calib, "90")\
+        #                                 for v in od90]
+        # data.loc[:, "od_plinear_both"] = [getestod(v135, calib,  "135")\
+        #                                   if od < odinflection else od\
+        #                                   for od,v90, v135 in zip(data.od_plinear_90.values, d90, d135)]
+        return(od_plinear_90, od_plinear_135)
 
     def transform_data(self, data, vials, od_cal, temp_cal):
         od_data_2 = None
@@ -184,6 +228,14 @@ class EvolverNamespace(BaseNamespace):
             temps.append(temp_set)
             od_coefficients = od_cal['coefficients'][x]
             temp_coefficients = temp_cal['coefficients'][x]
+            ### CUSTOMp
+            try:
+                od_ac_data[x] = aj_convertod(od_data[x], od_data_2[x], calib)
+            except ValueError:
+                print("OD autocalib Error")
+                logger.error('OD autocalib error for vial %d, setting to NaN' % x)
+                od_ac_data[x] = 'Nan'                
+            ### CUSTOM            
             try:
                 if od_cal['type'] == SIGMOID:
                     #convert raw photodiode data into ODdata using calibration curve
@@ -257,6 +309,7 @@ class EvolverNamespace(BaseNamespace):
         # add a new field in the data dictionary
         data['transformed'] = {}
         data['transformed']['od'] = od_data
+        data['transformed']['od_autocalib'] = od_ac_data
         data['transformed']['temp'] = temp_data
         return data
 
@@ -387,6 +440,9 @@ class EvolverNamespace(BaseNamespace):
                 # make stirrate file
                 self._create_file(x, 'stirrate', defaults=["Clock time,time elasped,stir_rate",
                                                            "{0},{1},{2}".format(0,0,8)])
+                # make stirrate file
+                self._create_file(x, 'OD_autocalib', defaults=["time,od_plinear_90,od_plinear_135"])
+                self._create_file(x, 'growthrate', defaults=[expt_str])                                
                 ## CUSTOM                
                 
                 # make temperature data file
@@ -470,7 +526,10 @@ class EvolverNamespace(BaseNamespace):
             file_name =  "vial{0}_{1}.txt".format(x, parameter)
             file_path = os.path.join(EXP_DIR, parameter, file_name)
             text_file = open(file_path, "a+")
-            text_file.write("{0},{1}\n".format(elapsed_time, data[x]))
+            if parameter == "OD_autocalib":
+                text_file.write("{0},{1},{2}\n".format(elapsed_time, data[x][0], data[x][1]))
+            else:
+                text_file.write("{0},{1}\n".format(elapsed_time, data[x]))                
             text_file.close()
 
     def save_variables(self, start_time, OD_initial):
