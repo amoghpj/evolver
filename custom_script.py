@@ -110,6 +110,55 @@ def growth_curve_stop_stir(eVOLVER, input_data, vials, elapsed_time):
     eVOLVER.update_stir_rate(newstirrates)
     return
 
+def write_calibration_to_file(startOD, finalOD, volume, vials):
+     for sensor, vial in product(["90","135"], range(vials)):
+         df = pd.read_csv(f"./{experiment}/od_{sensor}_raw/vial{vial}_od_{sensor}_raw.txt",
+                          header=None).iloc[1:,].astype(float)    
+         stirdf = pd.read_csv(f"./{experiment}/stirrate/vial{vial}_stirrate.txt").iloc[1:]
+         pumpdf = pd.read_csv(f"./{experiment}/pump_log/vial{vial}_pump_log.txt",
+                              names=["time","pump"]).iloc[1:].astype(float)
+
+         df["time"] = df[0]
+         df["reading"] = df[1]
+         df["estimated_od"] = 0
+         df["vial"] = vial
+         df["sensor"] = sensor
+         df["stirrate"] = stirdf.stir_rate
+         df["pump"] = 0
+         num_pump_events = 20
+         bolus = vvolumes[vial]*(1-(finalOD/startOD[vial])**(1/num_pump_events))/((finalOD/startOD[vial])**(1/num_pump_events))
+         prevtime = 0
+         for dil, (i, row) in enumerate(pumpdf[pumpdf.time > 0].iterrows()):
+             df.loc[df.time == row.time, "pump"] = row.pump
+             df.loc[(df.time > prevtime) & (df.time <= row.time), "estimated_od"] = startOD[vial]*(vvolumes[vial]/(vvolumes[vial] + bolus))**(dil)
+             prevtime = row.time
+         df = df[["time","reading","vial","sensor","stirrate","pump", "estimated_od"]]
+         dflist.append(df)
+
+     calibdf = pd.concat(dflist)
+     calibdf["readingtype"] = "calibration"
+     calibdf = calibdf.groupby(["vial", "sensor",
+                                "stirrate",
+                                "estimated_od"])\
+                      .agg({"reading":"median","time":"median"}).reset_index()
+
+     calibdf = calibdf.merge(calibdf[calibdf.sensor == "135"]\
+                             .groupby(["vial", "stirrate"])\
+                             .reading.min()\
+                             .reset_index()\
+                             [["reading","vial","stirrate"]],
+                       on=["vial", "stirrate"], suffixes=[None, "_inflection"])
+     calibdf = calibdf.merge(calibdf.loc[(calibdf.sensor == "135")\
+                                      & (calibdf.reading == calibdf.reading_inflection),
+                                      ["vial","stirrate","estimated_od"]],
+                             on=["vial","stirrate"],suffixes = [None,"_inflection"])
+
+     calibdf["estimated_od_inflection"] = calibdf["estimated_od_inflection"] - INFLECTION_CORRECTION
+     calibdf["prevod"] = calibdf.groupby(["vial","stirrate","sensor"]).estimated_od.shift(1)
+     calibdf["prevreading"] = calibdf.groupby(["vial","stirrate","sensor"]).reading.shift(1)
+     calibdf = calibdf.dropna()
+     calibdf.to_csv(f"{experiment}-calibration.csv")
+     
 def per_vial_od_calibration(eVOLVER, input_data, vials, elapsed_time):
     """
     Runs pumps for 
@@ -171,6 +220,7 @@ def per_vial_od_calibration(eVOLVER, input_data, vials, elapsed_time):
                                sep=",",names=["elapsed_time","last_pump"],
                                skiprows=[0])
         if pumpdata.shape[0] > num_pump_events:
+            write_calibration_to_file(startOD, volume, vials)
             print("Ending calibration")
             sys.exit()
         last_pump = pumpdata.iloc[-1,0]
