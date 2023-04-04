@@ -10,7 +10,8 @@ import time
 import seaborn as sns
 import sys 
 from tqdm import tqdm
-
+def bye():
+    sys.exit()
 # def growth_rate(time, od,winsize):
 #     intercepts = []
 #     slopes = []
@@ -24,65 +25,75 @@ from tqdm import tqdm
 #         midpoint.append(np.median(time[i:i+winsize]))
 #     return(intercepts, slopes,midpoint)
 INFLECTION_CORRECTION = 0
-experiment = "NC-calib"
+experiment = "NCB-turbidostat-calibration"
 dflist = []
-vvolumes = [17.64, 17.9, 18.49, 17.49,
-              17.86, 17.41, 18.04, 18.16,
-              17.61, 17.35, 18.21, 17.85, 
-              17.88, 18.07, 17.99, 16.69]
+vvolumes = [21.47, 22.29, 21.81, 21.39,
+           21.76,21.13, 21.55, 21.53,
+           20.95, 21.83, 22.05, 21.46,
+           21.21, 21.35, 21.66, 21.81]
+startod = [0.892,0.892,0.892,0.892,
+           0.918,0.918,0.918,0.918,
+           0.711,0.711,0.711,0.711,
+           0.677,0.677,0.677,0.677]
+finalod = []
 
-finalod = [
-    0.042, 0.029, 0.054, 0.046,
-    0.058, 0.065, 0.051, 0.049,
-    0.062, 0.057, 0.061, 0.052,
-    0.176, 0.063, 0.068, 0.071]
-startod = [1.0]*16
 
 for sensor, vial in product(["90","135"], range(16)):
     df = pd.read_csv(f"./{experiment}/od_{sensor}_raw/vial{vial}_od_{sensor}_raw.txt",
                      header=None).iloc[1:,].astype(float)    
-    stirdf = pd.read_csv(f"./{experiment}/stirrate/vial{vial}_stirrate.txt").iloc[1:]
     pumpdf = pd.read_csv(f"./{experiment}/pump_log/vial{vial}_pump_log.txt",
                          names=["time","pump"]).iloc[1:].astype(float)
     
     df["time"] = df[0]
     df["reading"] = df[1]
-    df["estimated_od"] = 0
+    df["estimated_od"] = np.nan
     df["vial"] = vial
     df["sensor"] = sensor
-    df["stirrate"] = stirdf.stir_rate
-    df["pump"] = 0
-    num_pump_events = 20
+    df["pump"] = np.nan
+    df["dilevent"] = 0
+    num_pump_events = 10
 
-    bolus = vvolumes[vial]*(1-(0.05/startod[vial])**(1/num_pump_events))/((0.05/startod[vial])**(1/num_pump_events))
+    bolus = vvolumes[vial]*(1-(finalod[vial]/startod[vial])**(1/num_pump_events))/((finalod[vial]/startod[vial])**(1/num_pump_events))
+
     prevtime = 0
-    for dil, (i, row) in enumerate(pumpdf[pumpdf.time > 0].iterrows()):
+    pumpdf = pumpdf.reset_index(drop=True)
+    pumpeventidx = pumpdf.index.values
+    for dil, (i, row) in enumerate(pumpdf.iterrows()):
         df.loc[df.time == row.time, "pump"] = row.pump
-        df.loc[(df.time > prevtime) & (df.time <= row.time), "estimated_od"] = startod[vial]*(vvolumes[vial]/(vvolumes[vial] + bolus))**(dil)
+        if len(pumpeventidx) < dil + 2:
+            print("here")
+            df.loc[df.time > row.time, "dilevent"] = dil
+            df.loc[df.time > row.time, "estimated_od"] = startod[vial]*(vvolumes[vial]/(vvolumes[vial] + bolus))**(dil)
+        else:
+            
+            df.loc[(df.time > row.time) & (df.time <= pumpdf.loc[pumpeventidx[dil + 1], "time"]), "dilevent"] = dil
+            df.loc[(df.time > row.time) & (df.time <= pumpdf.loc[pumpeventidx[dil + 1], "time"]), "estimated_od"] = startod[vial]*(vvolumes[vial]/(vvolumes[vial] + bolus))**(dil)
         prevtime = row.time
-    df = df[["time","reading","vial","sensor","stirrate","pump", "estimated_od"]]
+    df = df[["time","reading","vial","sensor","pump", "estimated_od", "dilevent"]]
     dflist.append(df)
 
 calibdf = pd.concat(dflist)
+#calibdf = calibdf[calibdf.dilevent <= 9]
+
 calibdf["readingtype"] = "calibration"
 calibdf = calibdf.groupby(["vial", "sensor",
-                           "stirrate",
-                           "estimated_od"])\
+                           "estimated_od","dilevent"])\
                  .agg({"reading":"median","time":"median"}).reset_index()
 
 calibdf = calibdf.merge(calibdf[calibdf.sensor == "135"]\
-                        .groupby(["vial", "stirrate"])\
+                        .groupby(["vial", ])\
                         .reading.min()\
                         .reset_index()\
-                        [["reading","vial","stirrate"]],
-                  on=["vial", "stirrate"], suffixes=[None, "_inflection"])
+                        [["reading","vial",]],
+                  on=["vial", ], suffixes=[None, "_inflection"])
 calibdf = calibdf.merge(calibdf.loc[(calibdf.sensor == "135")\
                                  & (calibdf.reading == calibdf.reading_inflection),
-                                 ["vial","stirrate","estimated_od"]],
-                        on=["vial","stirrate"],suffixes = [None,"_inflection"])
+                                 ["vial","estimated_od"]],
+                        on=["vial",],suffixes = [None,"_inflection"])
 
 calibdf["estimated_od_inflection"] = calibdf["estimated_od_inflection"] - INFLECTION_CORRECTION
-calibdf["prevod"] = calibdf.groupby(["vial","stirrate","sensor"]).estimated_od.shift(1)
-calibdf["prevreading"] = calibdf.groupby(["vial","stirrate","sensor"]).reading.shift(1)
-calibdf = calibdf.dropna()
+calibdf["prevod"] = calibdf.groupby(["vial","sensor"]).estimated_od.shift(1)
+calibdf["prevreading"] = calibdf.groupby(["vial","sensor"]).reading.shift(1)
+# calibdf = calibdf[calibdf.prevod > 0]
+# calibdf = calibdf.dropna()
 calibdf.to_csv(f"{experiment}-calibration.csv")

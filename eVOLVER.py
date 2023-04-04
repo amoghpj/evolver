@@ -160,9 +160,11 @@ class EvolverNamespace(BaseNamespace):
     def aj_convertod(self, od90, od135, x):
         try:
             calib = pd.read_csv(f"{EXP_NAME}-calibration.csv",index_col=0)
-        except:
-            print("No calibration file found!")
-            sys.exit()
+            
+        except Exception:
+            #print("No calibration file found!")
+            # raise
+            return(['NaN', 'NaN'])
 
         calib = calib.sort_values(by=["vial","time"]).reset_index(drop=True)
         piecewiselinear = lambda x1, x2, y1, y2, x: ((y2 - y1)/(x2 - x1)) * (x - x1) + y1
@@ -173,8 +175,7 @@ class EvolverNamespace(BaseNamespace):
             crow = calib.loc[(v < calib.prevreading)\
                             & (v >= calib.reading)\
                              & (calib.sensor == int(sensor))\
-                             & (calib.vial == int(x))\
-                             & (calib.stirrate == 8),
+                             & (calib.vial == int(x)),
                             [f"estimated_od", f"prevod",
                              f"reading", f"prevreading"
                              ]]
@@ -182,23 +183,15 @@ class EvolverNamespace(BaseNamespace):
                 transformed = piecewiselinear(crow[f"reading"],crow[f"prevreading"],
                                         crow[f"estimated_od"],crow[f"prevod"],
                                         v).values[0]
-                print(transformed)
                 return(transformed)
             else:
                 return(np.nan)
-        # d90 = data["90"].values
-        # d135 = data["135"].values
         odinflection = calib.estimated_od_inflection.unique()[0]
         od_plinear_90 = getestod(od90, calib, "90")
         od_plinear_135 = "NaN"
         if od_plinear_90 < odinflection:
-            od_plinear_135 = getestod(od135, calib,  "135")\
-        # od_plinear_135 = getestod(v, calib, "90")        
-        # data.loc[:, "od_plinear_90"] = [getestod(v, calib, "90")\
-        #                                 for v in od90]
-        # data.loc[:, "od_plinear_both"] = [getestod(v135, calib,  "135")\
-        #                                   if od < odinflection else od\
-        #                                   for od,v90, v135 in zip(data.od_plinear_90.values, d90, d135)]
+            od_plinear_135 = getestod(od135, calib,  "135")
+
         return([od_plinear_90, od_plinear_135])
 
     def transform_data(self, data, vials, od_cal, temp_cal):
@@ -220,10 +213,11 @@ class EvolverNamespace(BaseNamespace):
             return None
 
         od_data = np.array([float(x) for x in od_data])
+        od90_data = np.array([float(x) for x in od_data])        
 
         if od_data_2:
             od_data_2 = np.array([float(x) for x in od_data_2])
-            od_ac_data = np.array([[float(x),float(y)] for x,y in zip(od_data, od_data_2)])        
+            od_ac_data = np.array([[float(x),float(y)] for x,y in zip(od90_data, od_data_2)])        
         temp_data = np.array([float(x) for x in temp_data])
         set_temp_data = np.array([float(x) for x in set_temp_data])
 
@@ -237,13 +231,7 @@ class EvolverNamespace(BaseNamespace):
             od_coefficients = od_cal['coefficients'][x]
             temp_coefficients = temp_cal['coefficients'][x]
             ### CUSTOMp
-            try:
-                od_ac_data[x] = self.aj_convertod(od_data[x], od_data_2[x], x)
-            except ValueError:
-                print("OD autocalib Error")
-                logger.error('OD autocalib error for vial %d, setting to NaN' % x)
-                od_ac_data[x] = 'Nan'                
-            ### CUSTOM            
+
             try:
                 if od_cal['type'] == SIGMOID:
                     #convert raw photodiode data into ODdata using calibration curve
@@ -272,6 +260,14 @@ class EvolverNamespace(BaseNamespace):
                 print("OD Read Error")
                 logger.error('OD read error for vial %d, setting to NaN' % x)
                 od_data[x] = 'NaN'
+            try:
+                od_ac_data[x] = self.aj_convertod(od90_data[x], od_data_2[x], x)
+
+            except ValueError:
+                print("OD autocalib Error")
+                logger.error('OD autocalib error for vial %d, setting to NaN' % x)
+                od_ac_data[x] = 'Nan'                
+            ### CUSTOM                            
             try:
                 temp_data[x] = (float(temp_data[x]) *
                                 temp_coefficients[0]) + temp_coefficients[1]

@@ -5,11 +5,19 @@ import pandas as pd
 import seaborn as sns
 from itertools import product
 
-experiment = "XA08-dilute"
+experiment = "NC-turbidostat-calibration"
 dflist = []
-vvolumes = [17.752, 17.27, 17.81, 18.52]
-startod = [1.246, 1.302, 1.21, 1.214]
-for sensor, vial in product(["90","135"], range(4)):
+
+vvolumes = [21.47, 22.29, 21.81, 21.39,
+              21.76,21.13, 21.55, 21.53,
+              20.95, 21.83, 22.05, 21.46,
+              21.21, 21.35, 21.66, 21.81]
+startod = [0.892,0.892,0.892,0.892,
+               0.918,0.918,0.918,0.918,
+               0.711,0.711,0.711,0.711,
+               0.677,0.677,0.677,0.677]
+
+for sensor, vial in product(["90","135"], range(16)):
     df = pd.read_csv(f"./{experiment}/od_{sensor}_raw/vial{vial}_od_{sensor}_raw.txt",
                      header=None).iloc[1:,].astype(float)    
     stirdf = pd.read_csv(f"./{experiment}/stirrate/vial{vial}_stirrate.txt").iloc[1:]
@@ -45,7 +53,7 @@ for sensor,axrow in zip(["90","135"],[axes[:4], axes[4:]]):
             ax.axvline(row.time, color="k", alpha=0.4)
             ax.text(row.time, fulldf[(fulldf.sensor == sensor) & (fulldf.vial == vial) & (fulldf.time < row.time)].reading.median(), str(i))
 
-plt.savefig("xa08.png")
+plt.savefig(f"{experiment}-curves.png")
 
 plt.close()
 
@@ -54,4 +62,4 @@ g = sns.relplot(data=fulldf, x="estimated_od", y="reading",
             row="sensor",col="vial",hue="stirrate",
             facet_kws={"sharey":False})
 #g.set(xscale="log")
-plt.savefig("xa08-od-calibration.png")
+plt.savefig(f"{experiment}.png")
