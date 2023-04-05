@@ -12,6 +12,7 @@ import json
 import traceback
 import pandas as pd
 from scipy import stats
+from sklearn.linear_model import LinearRegression
 from socketIO_client import SocketIO, BaseNamespace
 from nbstreamreader import NonBlockingStreamReader as NBSR
 
@@ -99,10 +100,10 @@ class EvolverNamespace(BaseNamespace):
             self.save_data(data['transformed']['od'], elapsed_time,
                             VIALS, 'OD')
 
-            ### Custom
+            ### Begin custom
             self.save_data(data['transformed']['od_autocalib'], elapsed_time,
                            VIALS, 'OD_autocalib')
-            ### Custom
+            ### End custom
             self.save_data(data['transformed']['temp'], elapsed_time,
                             VIALS, 'temp')
 
@@ -170,7 +171,9 @@ class EvolverNamespace(BaseNamespace):
         piecewiselinear = lambda x1, x2, y1, y2, x: ((y2 - y1)/(x2 - x1)) * (x - x1) + y1
         
         def getestod(v, calib, sensor):
-            ## Linear interpolation for each observation in data
+            """
+            Linear interpolation for each observation in data
+            """
             estod90 = np.nan
             crow = calib.loc[(v < calib.prevreading)\
                             & (v >= calib.reading)\
@@ -432,6 +435,8 @@ class EvolverNamespace(BaseNamespace):
             os.makedirs(os.path.join(EXP_DIR, 'pump_log'))
             os.makedirs(os.path.join(EXP_DIR, 'ODset'))
             os.makedirs(os.path.join(EXP_DIR, 'growthrate'))
+            os.makedirs(os.path.join(EXP_DIR, 'growthrate_fromOD'))
+            os.makedirs(os.path.join(EXP_DIR, 'growthrate_status'))
             os.makedirs(os.path.join(EXP_DIR, 'chemo_config'))
             setup_logging(log_name, quiet, verbose)
             for x in vials:
@@ -446,8 +451,14 @@ class EvolverNamespace(BaseNamespace):
                 self._create_file(x, 'stirrate', defaults=["Clock time,time elasped,stir_rate",
                                                            "{0},{1},{2}".format(0,0,8)])
                 # make stirrate file
-                self._create_file(x, 'OD_autocalib', defaults=["time,od_plinear_90,od_plinear_135"])
+                self._create_file(x, 'OD_autocalib', 
+                                  defaults=["time,od_plinear_90,od_plinear_135"])
+                self._create_file(x, 'growthrate_fromOD',
+                                  defaults=[exp_str])                                
+                self._create_file(x, 'growthrate_status',
+                                  defaults=[exp_str,"0,0"])                                
                 self._create_file(x, 'growthrate', defaults=[exp_str])                                
+
                 ## CUSTOM                
                 
                 # make temperature data file
@@ -551,6 +562,21 @@ class EvolverNamespace(BaseNamespace):
         with open(PUMP_CAL_PATH) as f:
             pump_cal = json.load(f)
         return pump_cal['coefficients']
+
+    def aj_growth_rate(vial, time, od, winsize):
+        """
+        Custom growth rate estimation function
+        """
+        model = LinearRegression()
+        model.fit(time, np.log2(od))
+        intercept = model.intercept_[0]
+        midpoint = time[int(float((i+winsize)/2))]
+        # Save slope to file
+        file_name =  f"vial{vial}_growthrate_fromOD.txt"
+        gr_path = os.path.join(EXP_DIR, 'growthrate_fromOD', file_name)
+        with open(gr_path, "a+") as outfile:
+            text_file.write(f"{time[-1]},{slope}\n")
+        #return(intercepts, slopes,midpoint)
 
     def calc_growth_rate(self, vial, gr_start, elapsed_time):
         ODfile_name =  "vial{0}_OD.txt".format(vial)
