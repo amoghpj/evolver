@@ -10,29 +10,53 @@ import sys
 # logger setup
 logger = logging.getLogger(__name__)
 
-def bye():
+def bye(arg=None):
+    if arg is not None:
+        print(arg)
     sys.exit()
 
-def at_target_GR(vial, averageGR, target_GR, GRpass):
+def at_target_GR(vial, averageGR, target_GR, targetcheck,
+                 time, GRpass, GRcheck, file_name):
+    SAVE_PATH = os.path.dirname(os.path.realpath(__file__))
+    EXP_DIR = os.path.join(SAVE_PATH, EXP_NAME)
+    gr_status_path = os.path.join(EXP_DIR, 'growthrate_status', file_name)
+    TOLERANCE = 0.05
     if GRpass == 1:
+        with open(gr_status_path, "a+") as outfile:
+            outfile.write(f"{time[-1]},1,1\n")
         return True
     else:
-        TOLERANCE = 0.1
-        if abs(averageGR - target_GR) < TOLERANCE:
-            file_name =  f"vial{vial}_growthrate_status.txt"
-            gr_status_path = os.path.join(EXP_DIR, 'growthrate_status', file_name)
-            with open(gr_path, "a+") as outfile:
-                text_file.write(f"{time[-1]},1\n")
-            return True
+        if GRcheck == 1:
+            if abs(averageGR - target_GR) < TOLERANCE:
+                file_name =  f"vial{vial}_growthrate_status.txt"
+                with open(gr_status_path, "a+") as outfile:
+                    outfile.write(f"{time[-1]},1,1\n")
+                return True
+            else:
+                with open(gr_status_path, "a+") as outfile:
+                    outfile.write(f"{time[-1]},0,1\n")            
+                    return False
         else:
-            return False
+            if abs(averageGR - targetcheck) < TOLERANCE:
+                file_name =  f"vial{vial}_growthrate_status.txt"
+                with open(gr_status_path, "a+") as outfile:
+                    outfile.write(f"{time[-1]},0,1\n")
+                return False
+            else:
+                file_name =  f"vial{vial}_growthrate_status.txt"
+                with open(gr_status_path, "a+") as outfile:
+                    outfile.write(f"{time[-1]},0,0\n")
+                return False           
+            
+            
 
 ##### USER DEFINED GENERAL SETTINGS #####
 
 # If using the GUI for data visualization, do not change EXP_NAME!
 # only change if you wish to have multiple data folders within a single
 # directory for a set of scripts
-EXP_NAME = 'NC-turbidostat'
+EXP_NAME = "TS159"
+CALIB_NAME = "TS159-calibration"
 
 # Port for the eVOLVER connection. You should not need to change this unless you have multiple applications on a single RPi.
 EVOLVER_PORT = 8081
@@ -41,12 +65,12 @@ EVOLVER_PORT = 8081
 
 #TEMP_INITIAL = [30] * 16 #degrees C, makes 16-value list
 #Alternatively enter 16-value list to set different values
-TEMP_INITIAL = [37,37,37,
-                37,37,37,
-                37,37,37,
-                37,37,37,
-                37,37,37,
-                37]
+TEMP_INITIAL = [30,30,30,
+                30,30,30,
+                30,30,30,
+                30,30,30,
+                30,30,30,
+                30]
 
 STIR_INITIAL = [8,8,8,
                 8,8,8,
@@ -59,11 +83,10 @@ STIR_INITIAL = [8,8,8,
 #STIR_INITIAL = [7,7,7,7,8,8,8,8,9,9,9,9,10,10,10,10]
 
 #VOLUME =  19 #mL, determined by vial cap straw length
-VOLUME = [21.48,21.87,21.78,21.33,
-          21.95,21.33,21.98,21.2,
-          21.87,22,21.92,21.79,
-          21.67,21.46,21.51,22.05]
-
+VOLUME = [ 21.82, 20.85, 21.48, 21.18,
+           22.22, 21.55, 21.52,  22.8,
+           0,0,0,0,
+           0,0,0,0]
 ## Choose one of:
 # 1. growthcurve
 # 2. growth_curve_stop_stir
@@ -71,7 +94,7 @@ VOLUME = [21.48,21.87,21.78,21.33,
 # 4. turbidostat
 # 5. per_vial_od_calibration
 
-OPERATION_MODE = "turbidostat" #"growth_curve_stop_stir"
+OPERATION_MODE = "chemostat" #"growth_curve_stop_stir"
 
 
 # if using a different mode, name your function as the OPERATION_MODE variable
@@ -185,34 +208,29 @@ def per_vial_od_calibration(eVOLVER, input_data, vials, elapsed_time):
     """
     Runs pumps for 
     """
-    volume = [21.48,21.87,21.78,21.33,
-              21.95,21.33,21.98,21.2,
-              21.87,22,21.92,21.79,
-              21.67,21.46,21.51,22.05]
-
 
     ## First define pump action.
     ## Modify this section to increase the dilution size
 
-    startOD = [1.54,1.54,1.54,1.54,
-               1.11,1.11,1.11,1.11,
-               1.622,1.622,1.622,1.622,
-               1.106,1.106,1.106,1.106]
+    startOD = [0.712, 0.712, 0.712, 0.712,
+               0.776, 0.776, 0.776, 0.776,
+               0,0,0,0,
+               0,0,0,0]
 
-    endOD = 0.075
-    num_pump_events = 10
+    endOD = 0.05
+    num_pump_events = 15
 
     vials_to_run = [1,1,1,1,
                     1,1,1,1,
-                    1,1,1,1,
-                    1,1,1,1]
+                    0,0,0,0,
+                    0,0,0,0]
     STIR_SPACING = 2
     last_off = 0
     last_on = 0
     newstirrates = []
     
     
-    volume_per_step = [vtr*vsleeve*(1-(endOD/od)**(1/num_pump_events))/((endOD/od)**(1/num_pump_events)) if (od > 0) else 0 for vsleeve, od, vtr in zip(volume, startOD, vials_to_run)]
+    volume_per_step = [vtr*vsleeve*(1-(endOD/od)**(1/num_pump_events))/((endOD/od)**(1/num_pump_events)) if (od > 0) else 0 for vsleeve, od, vtr in zip(VOLUME, startOD, vials_to_run)]
     
     flow_rate = eVOLVER.get_flow_rate() #read from calibration file
 
@@ -245,24 +263,26 @@ def per_vial_od_calibration(eVOLVER, input_data, vials, elapsed_time):
         pumpdata = pd.read_csv(pumplogs[x],
                                sep=",",names=["elapsed_time","last_pump"],
                                skiprows=[0])
-
+        print(pumpdata.shape)
         last_pump = pumpdata.iloc[-1,0]
         timein = 0
         oddata = oddata[oddata.elapsed_time > last_pump]
-        if oddata.shape[0] == 5:                
+        if oddata.shape[0] == 9:                
             MESSAGE[x] = "--"
             if vials_to_run[x] == 1:
                 MESSAGE[x+16] = str(15)
             else:
                 MESSAGE[x+16] = "--"
-            if pumpdata.shape[0] > num_pump_events + 1:
+
+        elif oddata.shape[0] == 10:
+            if pumpdata.shape[0] > num_pump_events:
                 #write_calibration_to_file(startOD, volume, vials)
                 print("Ending calibration. Please measure ODs next.")
-                sys.exit()
-        elif oddata.shape[0] == 6:
+                sys.exit()            
             timein = round(pump_run_duration[x],2)
             MESSAGE[x] = str(timein)
             MESSAGE[x + 16] = "--"
+            
             with open(pumplogs[x], "a+") as outfile:
                 outfile.write(f"{elapsed_time},{timein}\n")        
 
@@ -439,7 +459,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
 def chemostat(eVOLVER, input_data, vials, elapsed_time):
     OD_data = input_data['transformed']['od']
-    WINSIZE = 200
+    WINSIZE = 100
     ##### USER DEFINED VARIABLES #####
     start_OD = [0] * 16 # ~OD600, set to 0 to start chemostate dilutions at any positive OD
     start_time = [0] * 16 #hours, set 0 to start immediately
@@ -456,12 +476,15 @@ def chemostat(eVOLVER, input_data, vials, elapsed_time):
     #UNITS of 1/hr, NOT mL/hr, rate = flowrate/volume, so dilution rate ~ growth rate, set to 0 for unused vials
     #rate_config = [4.73] * 16 #to set all vials to the same value, creates 16-value list
     #Alternatively, use 16 value list to set different rates, use 0 for vials not being used
-    rate_config = [0.3,0.27,0.12,0.09,
-                   0.24,0.21,0.18,0.15,
-                   0.3,0.27,0.12,0.09,
-                   0.24,0.21,0.18,0.15]
+    rate_config = [0.33, 0.3, 0.24, 0.21,
+                   0.18, 0.15, 0.12, 0.09,
+                   0,0,0,0,
+                   0,0,0,0]
 
     target_GR = list(rate_config)
+    targetcheck = 0.2                                ## Cross this growth rate first
+
+    
     ##### END OF USER DEFINED VARIABLES #####
 
     if eVOLVER.experiment_params is not None:
@@ -489,15 +512,18 @@ def chemostat(eVOLVER, input_data, vials, elapsed_time):
         # Update chemostat configuration files for each vial
 
         #initialize OD and find OD path
-        file_name =  "vial{0}_OD.txt".format(x)
-
-        OD_path = os.path.join(eVOLVER.EXP_DIR, EXP_NAME, 'OD', file_name)
+        file_name =  "vial{0}_OD_autocalib.txt".format(x)
+        SAVE_PATH = os.path.dirname(os.path.realpath(__file__))
+        EXP_DIR = os.path.join(SAVE_PATH, EXP_NAME)
+        OD_path = os.path.join(EXP_DIR, 'OD_autocalib', file_name)
         ODdata_full = np.genfromtxt(OD_path, delimiter=',')
         ODdata = ODdata_full[-values_to_average:, :]
 
         ###
         ODdata_forgr = ODdata_full[-WINSIZE:, 1]
         time = ODdata_full[-WINSIZE:,0]
+        ## Estimate growth rate
+        eVOLVER.aj_growth_rate(x, time, ODdata_forgr)        
         ###
         average_OD = 0
         #initialize GR and find GR path
@@ -505,13 +531,17 @@ def chemostat(eVOLVER, input_data, vials, elapsed_time):
         GR_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'growthrate_fromOD', file_name)
         GRdata = eVOLVER.tail_to_np(GR_path, gr_values_to_average)
 
+        file_name =  "vial{0}_growthrate_status.txt".format(x)        
         GRstatus_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'growthrate_status', file_name)
-        GRpass = eVOLVER.tail_to_np(GR_path, 1)
+        GRstatus = pd.read_csv(GRstatus_path)
+        GRpass = GRstatus.iloc[-1]["GRstatus"]
+        GRcheck = GRstatus.iloc[-1]["GRcheck"]
 
         average_GR = 0
+
         #enough_ODdata = (len(data) > 7) #logical, checks to see if enough data points (couple minutes) for sliding window
 
-        if ODdata.size != 0: #waits for seven OD measurements (couple minutes) for sliding window
+        if (ODdata.size != 0) and (GRdata.size !=0): #waits for seven OD measurements (couple minutes) for sliding window
             #calculate median OD
             od_values_from_file = ODdata[:,1]
             average_OD = float(np.median(od_values_from_file))
@@ -536,14 +566,14 @@ def chemostat(eVOLVER, input_data, vials, elapsed_time):
             
             if ((elapsed_time > start_time[x])\
                 and (average_OD > start_OD[x]))\
-                and (at_target_GR(average_GR, target_GR[x], GRpass)):
+                and (at_target_GR(x, average_GR, target_GR[x], targetcheck,
+                                  time, GRpass, GRcheck, f"vial{x}_growthrate_status.txt")):
                 #calculate time needed to pump bolus for each pump
                 bolus_in_s[x] = bolus/flow_rate[x]
                 
-                gr = growth_rate(vial, time, ODdata_forgr)
                 # calculate the period (i.e. frequency of dilution events) based on user specified growth rate and bolus size
                 if rate_config[x] > 0:
-                    period_config[x] = (3600*bolus)/((rate_config[x])*VOLUME) #scale dilution rate by bolus size and volume
+                    period_config[x] = (3600*bolus)/((rate_config[x])*VOLUME[x]) #scale dilution rate by bolus size and volume
                 else: # if no dilutions needed, then just loops with no dilutions
                     period_config[x] = 0
 

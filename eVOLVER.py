@@ -18,6 +18,7 @@ from nbstreamreader import NonBlockingStreamReader as NBSR
 
 import custom_script
 from custom_script import EXP_NAME
+from custom_script import CALIB_NAME
 from custom_script import EVOLVER_PORT, OPERATION_MODE
 from custom_script import STIR_INITIAL, TEMP_INITIAL
 
@@ -160,7 +161,7 @@ class EvolverNamespace(BaseNamespace):
         
     def aj_convertod(self, od90, od135, x):
         try:
-            calib = pd.read_csv(f"{EXP_NAME}-calibration.csv",index_col=0)
+            calib = pd.read_csv(f"{CALIB_NAME}.csv",index_col=0)
             
         except Exception:
             #print("No calibration file found!")
@@ -359,7 +360,7 @@ class EvolverNamespace(BaseNamespace):
                 # influx
                 MESSAGE['value'][x] = '%.2f|%d' % (bolus_in_s[x], period_config[x])
                 # efflux
-                MESSAGE['value'][x + 16] = '%.2f|%d' % (bolus_in_s[x] * 2,
+                MESSAGE['value'][x + 16] = '%.2f|%d' % (bolus_in_s[x] * 5,  #### Amogh: changed from 2
                                                         period_config[x])
 
         if MESSAGE['value'] != current_pump:
@@ -456,7 +457,7 @@ class EvolverNamespace(BaseNamespace):
                 self._create_file(x, 'growthrate_fromOD',
                                   defaults=[exp_str])                                
                 self._create_file(x, 'growthrate_status',
-                                  defaults=[exp_str,"0,0"])                                
+                                  defaults=["time,GRstatus,GRcheck","0,0,0"])                                
                 self._create_file(x, 'growthrate', defaults=[exp_str])                                
 
                 ## CUSTOM                
@@ -563,19 +564,23 @@ class EvolverNamespace(BaseNamespace):
             pump_cal = json.load(f)
         return pump_cal['coefficients']
 
-    def aj_growth_rate(vial, time, od, winsize):
+    def aj_growth_rate(self, vial, time, od):
         """
         Custom growth rate estimation function
         """
-        model = LinearRegression()
-        model.fit(time, np.log2(od))
-        intercept = model.intercept_[0]
-        midpoint = time[int(float((i+winsize)/2))]
-        # Save slope to file
-        file_name =  f"vial{vial}_growthrate_fromOD.txt"
-        gr_path = os.path.join(EXP_DIR, 'growthrate_fromOD', file_name)
-        with open(gr_path, "a+") as outfile:
-            text_file.write(f"{time[-1]},{slope}\n")
+        idx = np.where(~np.isnan(od))
+        if idx[0].size > 50:
+            od = od[idx]
+            time = time[idx]
+            model = LinearRegression()
+            model.fit(time.reshape(-1,1), np.log(od))
+            slope = model.coef_[0]
+            intercept = model.intercept_
+            # Save slope to file
+            file_name =  f"vial{vial}_growthrate_fromOD.txt"
+            gr_path = os.path.join(EXP_DIR, 'growthrate_fromOD', file_name)
+            with open(gr_path, "a+") as outfile:
+                outfile.write(f"{time[-1]},{slope}\n")
         #return(intercepts, slopes,midpoint)
 
     def calc_growth_rate(self, vial, gr_start, elapsed_time):
