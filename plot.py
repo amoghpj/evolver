@@ -4,21 +4,45 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-experiment = "NC-turbostat"
+from itertools import product
+
+from custom_script import EXP_NAME
+
+plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
+             "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
+             "OD":{"names":["time","OD"], "plot": True, "plotvar":"OD"},
+             "OD_autocalib":{"names":["time","od_plinear_90", "od_plinear_135"], "plot": True, "plotvar":"od_plinear_135"}             
+             }
+
 dflist = []
-for i in range(16):
-    _df = pd.read_csv(f"NC-turbidostat/OD_autocalib/vial{i}_OD_autocalib.txt",names=["time","OD90","OD135"], skiprows=[0]).astype(float)
-    _df["vial"] = i
+for vial, plotthis in product(list(range(16)), plotthese.keys()):
+    _df = pd.read_csv(f"{EXP_NAME}/{plotthis}/vial{vial}_{plotthis}.txt",names=plotthese[plotthis]["names"],
+                      skiprows=[0]).astype(float)
+    _df["vial"] = vial
+    _df["datatype"] = plotthis
     dflist.append(_df)
 
-df = pd.concat(dflist)
-df = df[["time", "OD90","vial"]]
-df = df.dropna()
-df["Log2(OD)"] = np.log2(df.OD90)
-df = df[df.time > 2].reset_index(drop=True)
+df = pd.concat(dflist).reset_index()
+
+
 df["vial"] = df.vial.astype("category")
 
-sns.relplot(data=df, x="time",
-            y="Log2(OD)",
-            hue="vial", kind="line")
-plt.savefig("NC-timecourse.png")
+for plotthis in plotthese.keys():
+    print(plotthis)
+    yvar = plotthese[plotthis]["plotvar"]
+    if "autocalib" in plotthis:
+        df = df[df.datatype == plotthis].melt(id_vars=["time","vial"], value_vars=["od_plinear_90",
+                                                                          "od_plinear_135"],
+                                              var_name="sensor", value_name="inferred OD")
+        g = sns.relplot(data=df, x="time",
+                        y="inferred OD",
+                        col="vial", col_wrap=4,
+                        hue="sensor", kind="line")
+    else:
+        g = sns.relplot(data=df[df.datatype == plotthis], x="time",
+                        y=yvar,
+                        col="vial", col_wrap=4,
+                        hue="vial", kind="line")
+    if "raw" not in plotthis:
+        g.set(yscale="log")
+    plt.savefig(f"{EXP_NAME}-{plotthis}.png")
