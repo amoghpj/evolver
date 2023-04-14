@@ -4,15 +4,11 @@ matplotlib.use("Agg")
 import pandas as pd
 import seaborn as sns
 from itertools import product
-from custom_script import EXP_NAME, VOLUME
+from custom_script import EXP_NAME, VOLUME, STARTOD
 
-experiment = "NC-turbidostat-calibration"
 dflist = []
+startOD = STARTOD
 
-startOD = [0.709,0.709,0.729,0.729,
-           0.709,0.709,0.729,0.729,
-           0.703,0.703,0.719,0.719,
-           0.703,0.703,0.719,0.719]
 
 endOD = [0.08, 0.054, 0.053, 0.077,
          0.116, 0.09, 0.087, 0.093,
@@ -28,11 +24,11 @@ for sensor, vial in product(["90","135"], range(16)):
     
     df["time"] = df[0]
     df["reading"] = df[1]
-    df["estimated_od"] = 0
+    df["estimated_od"] = np.nan
     df["vial"] = vial
     df["sensor"] = sensor
     df["stirrate"] = stirdf.stir_rate
-    df["pump"] = 0
+    df["pump"] = np.nan
     num_pump_events = 20
     bolus = VOLUME[vial]*(1-(endOD[vial]/startOD[vial])**(1/num_pump_events))/((endOD[vial]/startOD[vial])**(1/num_pump_events))
     prevtime = 0
