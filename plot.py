@@ -1,3 +1,4 @@
+import yaml
 import pandas as pd
 import seaborn as sns
 import numpy as np
@@ -6,7 +7,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from itertools import product
 
-from custom_script import EXP_NAME
+f = open("experiment_parameters.yaml")
+config = yaml.safe_load(f)
+f.close()
+EXP_NAME = config["experiment_settings"]["exp_name"]
 
 plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
              "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
