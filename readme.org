@@ -1,0 +1,12 @@
+* Current design
+  1. The major caveat in passing message to the Rpi with the current design is that the strings are all expected to be _16 values separated by commas_.
+     This is currently handled by looping over =vials= which has a list of 16 integers, and populating lists like volumes, rates, and periods by looking up indices from other data sources, like user defined variables or 
+  2. 
+* Issues
+I am not a fan of this design, where the custom script is loaded in order to first load parameters, but control is then handed back to eVOLVER.py.
+[[file:eVOLVER.py::import custom_script
+from custom_script import EXP_NAME
+from custom_script import CALIB_NAME
+from custom_script import EVOLVER_PORT, OPERATION_MODE
+from custom_script import STIR_INITIAL, TEMP_INITIAL][Custom imports]]
+- Ideally, the config file is read once, and parameters are passed around in some data class or similar.

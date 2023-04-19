@@ -1,3 +1,4 @@
+import yaml
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("Agg")
@@ -5,8 +6,11 @@ import pandas as pd
 import seaborn as sns
 from itertools import product
 from custom_script import EXP_NAME, VOLUME
+f = open("experiment_parameters.yaml")
+config = yaml.safe_load(f)
+f.close()
+EXP_NAME = config["experiment_settings"]["exp_name"]
 
-experiment = "NC-turbidostat-calibration"
 dflist = []
 
 startOD = [0.709,0.709,0.729,0.729,

@@ -9,6 +9,7 @@ import logging
 import argparse
 import numpy as np
 import json
+import yaml
 import traceback
 import pandas as pd
 from scipy import stats
@@ -33,6 +34,7 @@ OD_CAL_PATH = os.path.join(SAVE_PATH, 'od_cal.json')
 TEMP_CAL_PATH = os.path.join(SAVE_PATH, 'temp_cal.json')
 PUMP_CAL_PATH = os.path.join(SAVE_PATH, 'pump_cal.json')
 JSON_PARAMS_FILE = os.path.join(SAVE_PATH, 'eVOLVER_parameters.json')
+YAML_PARAMS_FILE = os.path.join(SAVE_PATH, 'experiment_parameters.yaml')
 
 SIGMOID = 'sigmoid'
 LINEAR = 'linear'
@@ -490,6 +492,7 @@ class EvolverNamespace(BaseNamespace):
             stir_rate = STIR_INITIAL
             temp_values = TEMP_INITIAL
             if self.experiment_params:
+                if self.experiment_params["experiment_settings"]["stir_all"]
                 stir_rate = list(map(lambda x: x['stir'], self.experiment_params['vial_configuration']))
                 temp_values = list(map(lambda x: x['temp'], self.experiment_params['vial_configuration']))
             self.update_stir_rate(stir_rate)
@@ -733,13 +736,17 @@ if __name__ == '__main__':
 
 
     #changes terminal tab title in OSX
-    print('\x1B]0;eVOLVER EXPERIMENT: PRESS Ctrl-C TO PAUSE\x07')
+    # print('\x1B]0;eVOLVER EXPERIMENT: PRESS Ctrl-C TO PAUSE\x07')
 
     experiment_params = None
     if os.path.exists(JSON_PARAMS_FILE):
         with open(JSON_PARAMS_FILE) as f:
             experiment_params = json.load(f)
-    evolver_ip = experiment_params['ip'] if experiment_params is not None else options.ip_address
+    if os.path.exists(YAML_PARAMS_FILE):
+        with open(YAML_PARAMS_FILE) as f:
+            experiment_params = yaml.load(f)
+    evolver_ip = experiment_params["experiment_settings"]['ip']\
+        if experiment_params is not None else options.ip_address
     if evolver_ip is None:
         logger.error('No IP address found. Please provide on the command line or through the GUI.')
         parser.print_help()
