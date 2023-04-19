@@ -18,7 +18,7 @@ f.close()
 # directory for a set of scripts
 EXP_NAME = config["experiment_settings"]["exp_name"]
 CALIB_NAME = config["experiment_settings"]["calib_name"]
-OPERATION_MODE = config["experiment_settings"]["operation_mode"]
+operation_mode = config["experiment_settings"]["operation"]["mode"]
 
 if config["experiment_settings"]["stir_all"] is not None:
     stir = config["experiment_settings"]["stir_all"]
@@ -35,19 +35,27 @@ CHEMO_RATE = []
 CHEMO_START_OD = []
 CHEMO_START_TIME = []
 
+if config["experiment_settings"]["operation"]["mode"] == "calibration":
+    settings = config["experiment_settings"]["operation"]
+    CALIBRATION_END_OD = settings["experiment_parameters"]["operation"]["end_od"]
+    CALIBRATION_NUM_PUMP_EVENTS = settings["experiment_parameters"]["operation"]["num_pump_events"]    
+
 for vial in config["experiment_settings"]["per_vial_settings"]:
     if vial["to_run"] is True:
         VIALS_TO_RUN.append(vial["vial"])
         VOLUME.append(vial["volume"])
         CHEMO_RATE.append(vial["chemo_rate"])
         CHEMO_START_OD.append(vial["chemo_start_od"])
+        CHEMO_END_OD.append(vial["chemo_end_od"])        
         CHEMO_START_TIME.append(vial["chemo_start_time"])
     else:
         #VIALS_TO_RUN.append(0)
         VOLUME.append(vial["volume"])
         CHEMO_RATE.append(np.nan)
         CHEMO_START_OD.append(np.nan)
+        CHEMO_END_OD.append(np.nan)                
         CHEMO_START_TIME.append(np.nan)        
+
 # Port for the eVOLVER connection. You should not need to change this unless you have multiple applications on a single RPi.
 EVOLVER_PORT = 8081
 
@@ -162,8 +170,8 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
     last_off = 0
     last_on = 0
     newstirrates = []
-    
-    
+    endOD = CALIBRATION_END_OD
+    num_pump_events = CALIBRATION_NUM_PUMP_EVENTS
     volume_per_step = [vtr*vsleeve*(1-(endOD/od)**(1/num_pump_events))/((endOD/od)**(1/num_pump_events)) if (od > 0) else 0 for vsleeve, od, vtr in zip(VOLUME, CHEMO_START_OD, VIALS_TO_RUN)]
     
     flow_rate = eVOLVER.get_flow_rate() #read from calibration file

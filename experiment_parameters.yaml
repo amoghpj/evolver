@@ -1,18 +1,25 @@
 experiment_settings:
   ip: "192.168.1.2"
   exp_name: "TS159B-chemostat"
-  ## Choose one of:
+
+  # Set this only AFTER the custom calibration has been performed
+  calib_name: ""  
+
+  ## MODE should be one of:
   # 1. growthcurve
   # 2. growth_curve_stop_stir
   # 3. chemostat
   # 4. turbidostat
   # 5. calibration
-  operation_mode: "calibration"
+  operation:
+    mode: "calibration"
     end_od: 0.09
     num_pump_events: 20
-  calib_name: ""
+    
   stir_all: 8
   temp_all: 30
+
+  # Configure vials here:
   per_vial_settings:
     - vial: 0
       to_run: True
@@ -21,6 +28,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 1
       to_run: True
       volume: 22.15
@@ -28,6 +36,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 2
       to_run: True
       volume: 21.15
@@ -35,6 +44,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 3
       to_run: True
       volume: 21.51 
@@ -42,6 +52,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 4
       to_run: True
       volume: 20.56
@@ -49,6 +60,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 5
       to_run: True
       volume: 21.57
@@ -56,6 +68,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 6
       to_run: True
       volume: 21.56
@@ -63,6 +76,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 7
       to_run: True
       volume: 22.07
@@ -70,6 +84,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 8
       to_run: True
       volume: 22.7
@@ -84,6 +99,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 10
       to_run: True
       volume: 22.26
@@ -98,6 +114,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 12
       to_run: True
       volume: 21.65
@@ -105,6 +122,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 13
       to_run: True
       volume: 22.19
@@ -112,6 +130,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 14
       to_run: True
       volume: 22.21
@@ -119,6 +138,7 @@ experiment_settings:
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
+      
     - vial: 15
       to_run: True
       volume: 21.98
