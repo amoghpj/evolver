@@ -9,7 +9,7 @@ import sys
 
 
 ##### USER DEFINED GENERAL SETTINGS #####
-f = open("custom_parameters.yaml")
+f = open("experiment_parameters.yaml")
 config = yaml.safe_load(f)
 f.close()
 
@@ -18,7 +18,7 @@ f.close()
 # directory for a set of scripts
 EXP_NAME = config["experiment_settings"]["exp_name"]
 CALIB_NAME = config["experiment_settings"]["calib_name"]
-operation_mode = config["experiment_settings"]["operation"]["mode"]
+OPERATION_MODE = config["experiment_settings"]["operation"]["mode"]
 
 if config["experiment_settings"]["stir_all"] is not None:
     stir = config["experiment_settings"]["stir_all"]
@@ -30,31 +30,40 @@ if config["experiment_settings"]["temp_all"] is not None:
 
 VIALS_TO_RUN = []
 VOLUME = []
+CALIBRATION_INITIAL_OD = []
 STARTOD = []
 CHEMO_RATE = []
 CHEMO_START_OD = []
 CHEMO_START_TIME = []
 
+
 if config["experiment_settings"]["operation"]["mode"] == "calibration":
     settings = config["experiment_settings"]["operation"]
-    CALIBRATION_END_OD = settings["experiment_parameters"]["operation"]["end_od"]
-    CALIBRATION_NUM_PUMP_EVENTS = settings["experiment_parameters"]["operation"]["num_pump_events"]    
+    CALIBRATION_END_OD = settings["end_od"]
+    for vial in config["experiment_settings"]["per_vial_settings"]:
+        if vial["to_run"] is True:    
+            CALIBRATION_INITIAL_OD.append(vial["calib_initial_od"])
+        else:
+            CALIBRATION_INITIAL_OD.append(0)
+    CALIBRATION_NUM_PUMP_EVENTS = config["experiment_settings"]["operation"]["num_pump_events"]
+
 
 for vial in config["experiment_settings"]["per_vial_settings"]:
     if vial["to_run"] is True:
-        VIALS_TO_RUN.append(vial["vial"])
+        VIALS_TO_RUN.append(1)
         VOLUME.append(vial["volume"])
         CHEMO_RATE.append(vial["chemo_rate"])
         CHEMO_START_OD.append(vial["chemo_start_od"])
-        CHEMO_END_OD.append(vial["chemo_end_od"])        
+        #CHEMO_END_OD.append(vial["chemo_end_od"])        
         CHEMO_START_TIME.append(vial["chemo_start_time"])
     else:
-        #VIALS_TO_RUN.append(0)
+        VIALS_TO_RUN.append(0)
         VOLUME.append(vial["volume"])
         CHEMO_RATE.append(np.nan)
         CHEMO_START_OD.append(np.nan)
-        CHEMO_END_OD.append(np.nan)                
-        CHEMO_START_TIME.append(np.nan)        
+        #CHEMO_END_OD.append(np.nan)                
+        CHEMO_START_TIME.append(np.nan)
+
 
 # Port for the eVOLVER connection. You should not need to change this unless you have multiple applications on a single RPi.
 EVOLVER_PORT = 8081
@@ -172,8 +181,9 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
     newstirrates = []
     endOD = CALIBRATION_END_OD
     num_pump_events = CALIBRATION_NUM_PUMP_EVENTS
-    volume_per_step = [vtr*vsleeve*(1-(endOD/od)**(1/num_pump_events))/((endOD/od)**(1/num_pump_events)) if (od > 0) else 0 for vsleeve, od, vtr in zip(VOLUME, CHEMO_START_OD, VIALS_TO_RUN)]
     
+    volume_per_step = [vtr*vsleeve*(1-(endOD/od)**(1/num_pump_events))/((endOD/od)**(1/num_pump_events))\
+                       if (od > 0) else 0 for vsleeve, od, vtr in zip(VOLUME, CALIBRATION_INITIAL_OD, VIALS_TO_RUN)]
     flow_rate = eVOLVER.get_flow_rate() #read from calibration file
 
     pump_run_duration = [volume_per_step[x]/flow_rate[x]
@@ -206,13 +216,12 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
         pumpdata = pd.read_csv(pumplogs[x],
                                sep=",",names=["elapsed_time","last_pump"],
                                skiprows=[0])
-        print(pumpdata.shape)
         last_pump = pumpdata.iloc[-1,0]
         timein = 0
         oddata = oddata[oddata.elapsed_time > last_pump]
         if oddata.shape[0] == 9:                
             MESSAGE[x] = "--"
-            if vials_to_run[x] == 1:
+            if VIALS_TO_RUN[x] == 1:
                 MESSAGE[x+16] = str(15)
             else:
                 MESSAGE[x+16] = "--"

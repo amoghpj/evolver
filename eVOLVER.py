@@ -491,10 +491,11 @@ class EvolverNamespace(BaseNamespace):
 
             stir_rate = STIR_INITIAL
             temp_values = TEMP_INITIAL
-            if self.experiment_params:
-                if self.experiment_params["experiment_settings"]["stir_all"]
-                stir_rate = list(map(lambda x: x['stir'], self.experiment_params['vial_configuration']))
-                temp_values = list(map(lambda x: x['temp'], self.experiment_params['vial_configuration']))
+            # if self.experiment_params:
+            #     if self.experiment_params["experiment_settings"]["stir_all"]:
+            #         stir_rate = 
+            #     if self.experiment_params["experiment_settings"]["temp_all"]:                    
+            #         temp_values = list(map(lambda x: x['temp'], self.experiment_params['vial_configuration']))
             self.update_stir_rate(stir_rate)
             self.update_temperature(temp_values)
 
@@ -665,7 +666,7 @@ class EvolverNamespace(BaseNamespace):
 
     def custom_functions(self, data, vials, elapsed_time):
         # load user script from custom_script.py
-        mode = self.experiment_params['function'] if self.experiment_params else OPERATION_MODE
+        mode = OPERATION_MODE
         if mode == 'turbidostat':
             custom_script.turbidostat(self, data, vials, elapsed_time)
         elif mode == 'chemostat':
@@ -733,8 +734,7 @@ def get_options():
 
 if __name__ == '__main__':
     options, parser = get_options()
-
-
+    print(options)
     #changes terminal tab title in OSX
     # print('\x1B]0;eVOLVER EXPERIMENT: PRESS Ctrl-C TO PAUSE\x07')
 
@@ -744,7 +744,7 @@ if __name__ == '__main__':
             experiment_params = json.load(f)
     if os.path.exists(YAML_PARAMS_FILE):
         with open(YAML_PARAMS_FILE) as f:
-            experiment_params = yaml.load(f)
+            experiment_params = yaml.safe_load(f)
     evolver_ip = experiment_params["experiment_settings"]['ip']\
         if experiment_params is not None else options.ip_address
     if evolver_ip is None:
