@@ -11,7 +11,7 @@ f = open("experiment_parameters.yaml")
 config = yaml.safe_load(f)
 f.close()
 EXP_NAME = config["experiment_settings"]["exp_name"]
-
+CALIB_NAME = config["experiment_settings"]["calib_name"]
 plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
              "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
              "OD":{"names":["time","OD"], "plot": True, "plotvar":"OD"},
