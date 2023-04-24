@@ -552,9 +552,9 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
     lower_thresh = [0.2] * len(vials) #to set all vials to the same value, creates 16-value list
     upper_thresh = [0.6] * 16
 
-    if eVOLVER.experiment_params is not None:
-        lower_thresh = list(map(lambda x: x['lower'], eVOLVER.experiment_params['vial_configuration']))
-        upper_thresh = list(map(lambda x: x['upper'], eVOLVER.experiment_params['vial_configuration']))
+    # if eVOLVER.experiment_params is not None:
+    #     lower_thresh = list(map(lambda x: x['lower'], eVOLVER.experiment_params['vial_configuration']))
+    #     upper_thresh = list(map(lambda x: x['upper'], eVOLVER.experiment_params['vial_configuration']))
 
     ##### END OF USER DEFINED VARIABLES #####
 
@@ -572,6 +572,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
     # fluidic message: initialized so that no change is sent
     MESSAGE = ['--'] * 48
+    newstirrates = []
     for x in turbidostat_vials: #main loop through each vial
         # Update turbidostat configuration files for each vial
         # initialize OD and find OD path
@@ -590,9 +591,46 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
         ## Custom
         file_name =  "vial{0}_OD_autocalib.txt".format(x)
         ODac_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'OD_autocalib', file_name)
-        data = eVOLVER.tail_to_np(ODac_path, OD_values_to_average)        
+        file_name =  "vial{0}_od_90_raw.txt".format(x)
+        OD90_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'od_90_raw', file_name)        
+        data =  eVOLVER.tail_to_np(ODac_path, OD_values_to_average)        
+        oddata = pd.read_csv(OD90_path,
+                             sep=",",names=["elapsed_time","od"],
+                                skiprows=[0]
+                             ) 
         average_OD = 0
+        ################################################
+        # Stir rate control
+        file_name =  "vial{0}_stirrate.txt".format(x)
+        stir_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'stirrate', file_name)
+        stirdata = np.genfromtxt(stir_path, delimiter=',')
+        oldstir = stirdata[len(stirdata)-1][2]
+        oldstirtime = stirdata[len(stirdata)-1][1]
+        newstir = None
+        lowstir = 0
+        highstir = 8
+        od_at_curr_stir = oddata[oddata.elapsed_time > oldstirtime]
 
+        if od_at_curr_stir.shape[0] ==10:
+            if oldstir == lowstir:
+                newstir = highstir
+            else:
+                newstir = lowstir
+            text_file = open(stir_path, "a+")
+            text_file.write("{0},{1},{2}\n".format(elapsed_time,
+                                                   elapsed_time,
+                                                   newstir))
+            text_file.close()
+        else:
+            newstir = oldstir
+            text_file = open(stir_path, "a+")
+            text_file.write("{0},{1},{2}\n".format(elapsed_time,
+                                                   oldstirtime,
+                                                   newstir))
+        newstirrates.append(newstir)
+        
+
+            ################################################        
         # Determine whether turbidostat dilutions are needed
         #enough_ODdata = (len(data) > 7) #logical, checks to see if enough data points (couple minutes) for sliding window
         collecting_more_curves = (num_curves <= (stop_after_n_curves + 2)) #logical, checks to see if enough growth curves have happened
@@ -651,6 +689,9 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
             logger.debug('not enough OD measurements for vial %d' % x)
 
     # send fluidic command only if we are actually turning on any of the pumps
+    print(newstirrates)
+    newstirrates = [str(d) for d in newstirrates]
+    eVOLVER.update_stir_rate(newstirrates)    
     if MESSAGE != ['--'] * 48:
         eVOLVER.fluid_command(MESSAGE)
 
