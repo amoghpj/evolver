@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use("Agg")
 import pandas as pd
 import seaborn as sns
+import numpy as np
 from itertools import product
 
 f = open("experiment_parameters.yaml")
@@ -12,15 +13,19 @@ f.close()
 EXP_NAME = config["experiment_settings"]["exp_name"]
 
 dflist = []
-startOD = STARTOD
 
+startOD = []
+endOD = []
+VOLUME = []
+VIALS_TO_RUN = []
+for vial in config["experiment_settings"]["per_vial_settings"]:
+    startOD.append(vial["calib_initial_od"])
+    VOLUME.append(vial["volume"])
+    endOD.append(config["experiment_settings"]["operation"]["end_od"])
+    if vial["to_run"] is True:
+        VIALS_TO_RUN.append(vial["vial"])
 
-endOD = [0.08, 0.054, 0.053, 0.077,
-         0.116, 0.09, 0.087, 0.093,
-         0.096, 0.056, 0.107, 0.097,
-         0.146, 0.099, 0.111,0.112]
-
-for sensor, vial in product(["90","135"], range(16)):
+for sensor, vial in product(["90","135"], VIALS_TO_RUN):
     df = pd.read_csv(f"./{EXP_NAME}/od_{sensor}_raw/vial{vial}_od_{sensor}_raw.txt",
                      header=None).iloc[1:,].astype(float)    
     stirdf = pd.read_csv(f"./{EXP_NAME}/stirrate/vial{vial}_stirrate.txt").iloc[1:]
