@@ -180,8 +180,7 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
     newstirrates = []
     endOD = CALIBRATION_END_OD
     num_pump_events = CALIBRATION_NUM_PUMP_EVENTS
-    
-    volume_per_step = [vtr*vsleeve*(1-(endOD/od)**(1/num_pump_events))/((endOD/od)**(1/num_pump_events))\
+    volume_per_step = [vtr*vsleeve*( (od/endOD)**(1/num_pump_events) - 1)\
                        if (od > 0) else 0 for vsleeve, od, vtr in zip(VOLUME, CALIBRATION_INITIAL_OD, VIALS_TO_RUN)]
     flow_rate = eVOLVER.get_flow_rate() #read from calibration file
 
@@ -226,7 +225,7 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
                 MESSAGE[x+16] = "--"
 
         elif oddata.shape[0] == 10:
-            if pumpdata.shape[0] > num_pump_events:
+            if pumpdata.shape[0] == num_pump_events:   ### This logic needs refinement
                 print("Ending calibration. Please measure ODs next.")
                 sys.exit()            
             timein = round(pump_run_duration[x],2)
@@ -238,6 +237,94 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
             
     if MESSAGE != ["--"]*48:
         eVOLVER.fluid_command(MESSAGE)
+
+#     ## First define pump action.
+#     ## Modify this section to increase the dilution size
+#     STIR_SPACING = 2
+#     last_off = 0
+#     last_on = 0
+#     newstirrates = []
+#     SAVE_PATH = os.path.dirname(os.path.realpath(__file__))
+#     EXP_DIR = os.path.join(SAVE_PATH, EXP_NAME)    
+#     if not os.path.exists(f"{EXP_DIR}/next_pump.txt"):
+#         with open(f"{EXP_DIR}/next_pump.txt","w") as outfile:
+#             outfile.write(0)
+#     with open(f"{EXP_DIR}/next_pump.txt","r") as outfile:
+#         runnext = int(outfile.readlines(0).strip())
+#     print(runnext)
+
+    
+#     endOD = CALIBRATION_END_OD
+#     num_pump_events = CALIBRATION_NUM_PUMP_EVENTS
+    
+#     volume_per_step = [vtr*vsleeve*(1-(endOD/od)**(1/num_pump_events))/((endOD/od)**(1/num_pump_events))\
+#                        if (od > 0) else 0 for vsleeve, od, vtr in zip(VOLUME, CALIBRATION_INITIAL_OD, VIALS_TO_RUN)]
+#     flow_rate = eVOLVER.get_flow_rate() #read from calibration file
+
+#     pump_run_duration = [volume_per_step[x]/flow_rate[x]
+#                          if flow_rate[x] != '' else 0 for x in vials] 
+#     MESSAGE = ["--"]*48
+#     pumplogs = [os.path.join(eVOLVER.exp_dir, EXP_NAME,
+#                                             "pump_log", f"vial{x}_pump_log.txt")
+#                 for x in vials]
+#     odlogs = [os.path.join(eVOLVER.exp_dir, EXP_NAME,
+#                                             "od_90_raw", f"vial{x}_od_90_raw.txt")
+#                 for x in vials]    
+#     pumpdata = pd.read_csv(pumplogs[0],
+#                            sep=",",names=["elapsed_time","last_pump"],
+#                            skiprows=[0])
+
+#     for x in vials:
+#         ## Stir control
+#         file_name =  "vial{0}_stirrate.txt".format(x)
+#         stir_path = os.path.join(eVOLVER.exp_dir, EXP_NAME, 'stirrate', file_name)
+#         data = np.genfromtxt(stir_path, delimiter=',')
+#         oldstir = data[len(data)-1][2]
+#         oldstirtime = data[len(data)-1][1]
+#         newstir = None
+#         lowstir = 0
+#         highstir = 8
+        
+#         oddata = pd.read_csv(odlogs[x],
+#                                sep=",",names=["elapsed_time","od90"],
+#                                skiprows=[0])
+#         pumpdata = pd.read_csv(pumplogs[x],
+#                                sep=",",names=["elapsed_time","last_pump"],
+#                                skiprows=[0])
+#         last_pump = pumpdata.iloc[-1,0]
+#         timein = 0
+#         oddata = oddata[oddata.elapsed_time > last_pump]
+#         if oddata.shape[0] >= 2:                
+#             MESSAGE[x] = "--"
+#             if (VIALS_TO_RUN[x] == 1) and (x == runnext):
+#                 MESSAGE[x+16] = str(15)
+#             else:
+#                 MESSAGE[x+16] = "--"
+
+#             # elif oddata.shape[0] == 10:
+#             if pumpdata.shape[0] > num_pump_events:
+#                 print("Ending calibration. Please measure ODs next.")
+#                 sys.exit()
+#             if ((runnext -1) == -1):
+#                 prevvial = 15
+#             else:
+#                 prevvial = runnext - 1
+                
+#             if (x == prevvial):
+#                 timein = round(pump_run_duration[x],2)
+#                 MESSAGE[x] = str(timein)
+#                 MESSAGE[x + 16] = "--"
+            
+#             with open(pumplogs[x], "a+") as outfile:
+#                 outfile.write(f"{elapsed_time},{timein}\n")        
+#     with open(f"{EXP_DIR}/next_pump.txt","w") as outfile:
+#         if runnext < 15:
+#             outfile.write(runnext + 1)
+#         else:
+#             outfile.write(0)
+            
+#     if MESSAGE != ["--"]*48:
+#         eVOLVER.fluid_command(MESSAGE)
 
 def turbidostat_default(eVOLVER, input_data, vials, elapsed_time):
     OD_data = input_data['transformed']['od']
