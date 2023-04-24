@@ -1,18 +1,25 @@
 * Current design
-  1. The major caveat in passing message to the Rpi with the current design is that the strings are all expected to be _16 values separated by commas_.
-     This is currently handled by looping over =vials= which has a list of 16 integers, and populating lists like volumes, rates, and periods by looking up indices from other data sources
-     like user defined variables.  This is pretty low level right now, and there is no real API to arbitrarily control sleeve behavior without resorting to
-     hacks like creating custom log files for history dependent control of sleeves
-  2. There are low level (arduino-level) event logging requirements which are going to be important to debug. This will impact things like:
+  1. The major caveat in passing message to the Rpi with the current
+     design is that the strings are all expected to be _16 values
+     separated by commas_.  This is currently handled by looping over
+     =vials= which has a list of 16 integers, and populating lists
+     like volumes, rates, and periods by looking up indices from other
+     data sources like user defined variables.  This is pretty low
+     level right now, and there is no real API to arbitrarily control
+     sleeve behavior without resorting to hacks like creating custom
+     log files for history dependent control of sleeves
+  2. There are low level (arduino-level) event logging requirements
+     which are going to be important to debug. This will impact things
+     like:
      1. Frequency of data logging
-     2. Types of data that are logged systematically (pump events in chemostat mode etc)
+     2. Types of data that are logged systematically (pump events in
+        chemostat mode etc)
 * Issues
-I am not a fan of this design, where the custom script is loaded in order to first load parameters, but control is then handed back to eVOLVER.py.
-[[file:eVOLVER.py::import custom_script
-from custom_script import EXP_NAME
-from custom_script import CALIB_NAME
-from custom_script import EVOLVER_PORT, OPERATION_MODE
-from custom_script import STIR_INITIAL, TEMP_INITIAL][Custom imports]]
-- Ideally, the config file is read once, and parameters are passed around in some data class or similar. See Issue #1.
-- No consistent API in adding custom experiment handling. Need to move away from using per-vial logic in a loop like it is currently setup.
+I am not a fan of this design, where the custom script is loaded in
+order to first load parameters, but control is then handed back to
+eVOLVER.py.  [[file:eVOLVER.py::import custom_script from custom_script import EXP_NAME from custom_script import CALIB_NAME from custom_script import EVOLVER_PORT, OPERATION_MODE from custom_script import STIR_INITIAL, TEMP_INITIAL][Custom imports]]
+- Ideally, the config file is read once, and parameters are passed
+  around in some data class or similar. See Issue [[http:github.com/amoghpj/evolver/issues/1]].
+- No consistent API in adding custom experiment handling. Need to move
+  away from using per-vial logic in a loop like it is currently setup.
 
