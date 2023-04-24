@@ -13,6 +13,6 @@ from custom_script import EXP_NAME
 from custom_script import CALIB_NAME
 from custom_script import EVOLVER_PORT, OPERATION_MODE
 from custom_script import STIR_INITIAL, TEMP_INITIAL][Custom imports]]
-- Ideally, the config file is read once, and parameters are passed around in some data class or similar. See Issue 1.
+- Ideally, the config file is read once, and parameters are passed around in some data class or similar. See Issue #1.
 - No consistent API in adding custom experiment handling. Need to move away from using per-vial logic in a loop like it is currently setup.
 
