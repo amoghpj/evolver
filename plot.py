@@ -31,6 +31,42 @@ df = pd.concat(dflist).reset_index()
 
 df["vial"] = df.vial.astype("category")
 
+fig, axes = plt.subplots(4,4, figsize=(16,16))
+
+axes = axes.flatten()
+
+for vial, ax in enumerate(axes):
+    rawc90 = pd.read_csv(f"{CALIB_NAME}/od_90_raw/vial{vial}_od_90_raw.txt",
+                       skiprows=[0],
+                       names=["time","od90"])
+    rawc135 = pd.read_csv(f"{CALIB_NAME}/od_135_raw/vial{vial}_od_135_raw.txt",
+                       skiprows=[0],
+                       names=["time","od135"])
+    cdat = calibdf[calibdf.vial == vial]
+    ax.scatter(cdat[90].values, cdat[135].values, label="Calibration Median")
+    ax.scatter(rawc90.od90.values,
+               rawc135.od135.values, c="r", alpha=0.1,label="Calibration Raw Values")    
+    ddat = df[df.vial == vial]
+    ax.scatter(ddat[ddat["datatype"] == "od_90_raw"].od_90_raw,
+            ddat[ddat["datatype"] == "od_135_raw"].od_135_raw,
+               c=ddat[ddat["datatype"] == "od_135_raw"].time.values,
+               s=3,
+               alpha=0.5, label="Chemostat Timecourse")
+    ax.set_xlabel("Sensor: 90")
+    ax.set_ylabel("Sensor: 135")
+    ax.set_xlim(52000, 63500)
+
+    ax.set_title(f"Vial {vial}")
+    if vial == 15:
+        ax.legend()
+    
+plt.tight_layout()    
+plt.savefig(f"{EXP_NAME}_projection.pdf")
+
+
+plt.close()
+
+
 for plotthis in plotthese.keys():
     print(plotthis)
     yvar = plotthese[plotthis]["plotvar"]
