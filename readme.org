@@ -22,4 +22,5 @@ eVOLVER.py.  [[file:eVOLVER.py::import custom_script from custom_script import E
   around in some data class or similar. See Issue [[http:github.com/amoghpj/evolver/issues/1]].
 - No consistent API in adding custom experiment handling. Need to move
   away from using per-vial logic in a loop like it is currently setup.
+- Define defaults for stirring control that are passed explicitly to each function definition
 

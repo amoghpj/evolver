@@ -39,7 +39,7 @@ if config["experiment_settings"]["temp_all"] is not None:
 VIALS_TO_RUN = []
 VOLUME = []
 CALIBRATION_INITIAL_OD = []
-CALIBRATION_INITIAL_OD = []
+CALIBRATION_END_OD = []
 CHEMO_RATE = []
 CHEMO_START_OD = []
 CHEMO_START_TIME = []
@@ -55,7 +55,7 @@ if config["experiment_settings"]["operation"]["mode"] == "calibration":
             CALIBRATION_INITIAL_OD.append(0)
     CALIBRATION_NUM_PUMP_EVENTS = settings["num_pump_events"]
     
-num_pump_events= CALIBRATION_NUM_PUMP_EVENTS -1
+num_pump_events= CALIBRATION_NUM_PUMP_EVENTS
 
 for vial in config["experiment_settings"]["per_vial_settings"]:
     if vial["to_run"] is True:
@@ -63,50 +63,52 @@ for vial in config["experiment_settings"]["per_vial_settings"]:
         VOLUME.append(vial["volume"])
         CHEMO_RATE.append(vial["chemo_rate"])
         CHEMO_START_OD.append(vial["chemo_start_od"])
-        #CHEMO_END_OD.append(vial["chemo_end_od"])        
         CHEMO_START_TIME.append(vial["chemo_start_time"])
     else:
         VIALS_TO_RUN.append(0)
         VOLUME.append(vial["volume"])
         CHEMO_RATE.append(np.nan)
         CHEMO_START_OD.append(np.nan)
-        #CHEMO_END_OD.append(np.nan)                
         CHEMO_START_TIME.append(np.nan)
 
-finalod = [0.16]*16
+if type(CALIBRATION_END_OD) is float:
+    finalod = [CALIBRATION_END_OD]*16
+else:
+    finalod = [CALIBRATION_END_OD]
 print(VOLUME)
 print(CALIBRATION_INITIAL_OD)
 dflist = []
 for sensor, vial in product(["90","135"], range(16)):
-    df = pd.read_csv(f"./{EXP_NAME}/od_{sensor}_raw/vial{vial}_od_{sensor}_raw.txt",
-                     header=None).iloc[1:,].astype(float)    
-    pumpdf = pd.read_csv(f"./{EXP_NAME}/pump_log/vial{vial}_pump_log.txt",
-                         names=["time","pump"],skiprows=[0]).astype(float)
-    
-    df["time"] = df[0]
-    df["reading"] = df[1]
-    df["estimated_od"] = np.nan
-    df["vial"] = vial
-    df["sensor"] = sensor
-    df["pump"] = np.nan
-    df["dilevent"] = 0
-    bolus = VOLUME[vial]*((CALIBRATION_INITIAL_OD[vial]/finalod[vial])**(1/num_pump_events) - 1)
-    print(bolus)
-    prevtime = 0
-    pumpdf = pumpdf.reset_index(drop=True)
-    pumpeventidx = pumpdf.index.values
-    for dil, (i, row) in enumerate(pumpdf.iterrows()):
-        df.loc[df.time == row.time, "pump"] = row.pump
-        if len(pumpeventidx) < dil + 2:
-            df.loc[df.time > row.time, "dilevent"] = dil
-            df.loc[df.time > row.time, "estimated_od"] = CALIBRATION_INITIAL_OD[vial]*(VOLUME[vial]/(VOLUME[vial] + bolus))**(dil)
-        else:
-            
-            df.loc[(df.time > row.time) & (df.time <= pumpdf.loc[pumpeventidx[dil + 1], "time"]), "dilevent"] = dil
-            df.loc[(df.time > row.time) & (df.time <= pumpdf.loc[pumpeventidx[dil + 1], "time"]), "estimated_od"] = CALIBRATION_INITIAL_OD[vial]*(VOLUME[vial]/(VOLUME[vial] + bolus))**(dil)
-        prevtime = row.time
-    df = df[["time","reading","vial","sensor","pump", "estimated_od", "dilevent"]]
-    dflist.append(df)
+    if VIALS_TO_RUN[vial] == 1:
+        df = pd.read_csv(f"./{EXP_NAME}/od_{sensor}_raw/vial{vial}_od_{sensor}_raw.txt",
+                         header=None).iloc[1:,].astype(float)    
+        pumpdf = pd.read_csv(f"./{EXP_NAME}/pump_log/vial{vial}_pump_log.txt",
+                             names=["time","pump"],skiprows=[0]).astype(float)
+
+        df["time"] = df[0]
+        df["reading"] = df[1]
+        df["estimated_od"] = np.nan
+        df["vial"] = vial
+        df["sensor"] = sensor
+        df["pump"] = np.nan
+        df["dilevent"] = 0
+        bolus = VOLUME[vial]*((CALIBRATION_INITIAL_OD[vial]/finalod[vial])**(1/num_pump_events) - 1)
+        print(bolus)
+        prevtime = 0
+        pumpdf = pumpdf.reset_index(drop=True)
+        pumpeventidx = pumpdf.index.values
+        for dil, (i, row) in enumerate(pumpdf.iterrows()):
+            df.loc[df.time == row.time, "pump"] = row.pump
+            if len(pumpeventidx) < dil + 2:
+                df.loc[df.time > row.time, "dilevent"] = dil
+                df.loc[df.time > row.time, "estimated_od"] = CALIBRATION_INITIAL_OD[vial]*(VOLUME[vial]/(VOLUME[vial] + bolus))**(dil)
+            else:
+
+                df.loc[(df.time > row.time) & (df.time <= pumpdf.loc[pumpeventidx[dil + 1], "time"]), "dilevent"] = dil
+                df.loc[(df.time > row.time) & (df.time <= pumpdf.loc[pumpeventidx[dil + 1], "time"]), "estimated_od"] = CALIBRATION_INITIAL_OD[vial]*(VOLUME[vial]/(VOLUME[vial] + bolus))**(dil)
+            prevtime = row.time
+        df = df[["time","reading","vial","sensor","pump", "estimated_od", "dilevent"]]
+        dflist.append(df)
 
 calibdf = pd.concat(dflist)
 #calibdf = calibdf[calibdf.dilevent <= 9]

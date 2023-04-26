@@ -1,9 +1,9 @@
 experiment_settings:
-  ip: "192.168.1.2"
-  exp_name: "TS159B-chemostat"
+  ip: "192.168.1.14"
+  exp_name: "debug-calib"
 
-  # Set this only AFTER the custom calibration has been performed
-  calib_name: ""  
+  # Uncomment this only AFTER the custom calibration has been performed
+  # calib_name: ""  
 
   ## MODE should be one of:
   # 1. growthcurve
@@ -11,13 +11,34 @@ experiment_settings:
   # 3. chemostat
   # 4. turbidostat
   # 5. calibration
+  # operation:
+  #   mode: "calibration"
+  #   end_od: 0.09
+  #   num_pump_events: 20
+
   operation:
-    mode: "calibration"
-    end_od: 0.09
-    num_pump_events: 20
+    mode: "chemostat"
+
+  # operation:
+  #   mode: "turbidostat"
+
+  # operation:
+  #   mode: "growthcurve"
+  
+  # operation:
+  #   mode: "calibration"
+  #   end_od: 0.07
+  #   num_pump_events: 25
     
-  stir_all: 8
+  stir_settings:
+    stir_on_rate: 4
+    stir_switch: True
+    stir_off_rate: 0
+    stir_on_duration: 2  ## number of data points collected
+    stir_off_duration: 10    
+  
   temp_all: 30
+  estimate_gr: True
 
   # Configure vials here:
   per_vial_settings:
@@ -25,14 +46,18 @@ experiment_settings:
       to_run: True
       volume: 22.3
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
       
     - vial: 1
-      to_run: True
+      to_run: False
       volume: 22.15
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -41,6 +66,8 @@ experiment_settings:
       to_run: True
       volume: 21.15
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -49,6 +76,8 @@ experiment_settings:
       to_run: True
       volume: 21.51 
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -57,6 +86,8 @@ experiment_settings:
       to_run: True
       volume: 20.56
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -65,6 +96,8 @@ experiment_settings:
       to_run: True
       volume: 21.57
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -73,6 +106,8 @@ experiment_settings:
       to_run: True
       volume: 21.56
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -81,6 +116,8 @@ experiment_settings:
       to_run: True
       volume: 22.07
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -89,6 +126,8 @@ experiment_settings:
       to_run: True
       volume: 22.7
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -96,6 +135,8 @@ experiment_settings:
       to_run: True
       volume: 21.88
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -104,6 +145,8 @@ experiment_settings:
       to_run: True
       volume: 22.26
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -111,6 +154,8 @@ experiment_settings:
       to_run: True
       volume: 22.23
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -119,6 +164,8 @@ experiment_settings:
       to_run: True
       volume: 21.65
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
@@ -127,23 +174,29 @@ experiment_settings:
       to_run: True
       volume: 22.19
       calib_initial_od: 0.709
+      turbidostat_low: 0.5
+      turbidostat_high: 1.0      
       chemo_start_od: 0
       chemo_rate: 0.3
       chemo_start_time: 0
       
-    - vial: 14
-      to_run: True
-      volume: 22.21
-      calib_initial_od: 0.709
-      chemo_start_od: 0
-      chemo_rate: 0.3
-      chemo_start_time: 0
+    # - vial: 14
+    #   to_run: True
+    #   volume: 22.21
+    #   calib_initial_od: 0.709
+      # turbidostat_low: 0.5
+      # turbidostat_high: 1.0    
+    #   chemo_start_od: 0
+    #   chemo_rate: 0.3
+    #   chemo_start_time: 0
       
-    - vial: 15
-      to_run: True
-      volume: 21.98
-      calib_initial_od: 0.709
-      chemo_start_od: 0
-      chemo_rate: 0.3
-      chemo_start_time: 0
+    # - vial: 15
+    #   to_run: True
+    #   volume: 21.98
+    #   calib_initial_od: 0.709
+    # turbidostat_low: 0.5
+    # turbidostat_high: 1.0    
+    #   chemo_start_od: 0
+    #   chemo_rate: 0.3
+    #   chemo_start_time: 0
 

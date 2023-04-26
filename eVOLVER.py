@@ -18,18 +18,20 @@ from socketIO_client import SocketIO, BaseNamespace
 from nbstreamreader import NonBlockingStreamReader as NBSR
 
 import custom_script
-from custom_script import EXP_NAME
-from custom_script import CALIB_NAME
-from custom_script import EVOLVER_PORT, OPERATION_MODE
-from custom_script import STIR_INITIAL, TEMP_INITIAL
-
+from custom_script import settings, EVOLVER_PORT
+# from custom_script import CALIB_NAME
+# from custom_script import EVOLVER_PORT, OPERATION_MODE
+# from custom_script import STIR_INITIAL, TEMP_INITIAL
+TEMP_INITIAL = settings.temperature
+STIR_INITIAL = settings.stir_on_rate
+OPERATION_MODE = settings.operation_mode
 # Should not be changed
 # vials to be considered/excluded should be handled
 # inside the custom functions
 VIALS = [x for x in range(16)]
 
 SAVE_PATH = os.path.dirname(os.path.realpath(__file__))
-EXP_DIR = os.path.join(SAVE_PATH, EXP_NAME)
+EXP_DIR = os.path.join(SAVE_PATH, settings.exp_name)
 OD_CAL_PATH = os.path.join(SAVE_PATH, 'od_cal.json')
 TEMP_CAL_PATH = os.path.join(SAVE_PATH, 'temp_cal.json')
 PUMP_CAL_PATH = os.path.join(SAVE_PATH, 'pump_cal.json')
@@ -70,7 +72,7 @@ class EvolverNamespace(BaseNamespace):
         logger.info('Broadcast received')
         elapsed_time = round((time.time() - self.start_time) / 3600, 4)
         logger.info('Elapsed time: %.4f hours' % elapsed_time)
-        print("{0}: {1} Hours".format(EXP_NAME, elapsed_time))
+        print("{0}: {1} Hours".format(settings.exp_name, elapsed_time))
         # are the calibrations in yet?
         if not self.check_for_calibrations():
             logger.warning('Calibration files still missing, skipping custom '
@@ -150,7 +152,7 @@ class EvolverNamespace(BaseNamespace):
                         if not os.path.isdir(os.path.join(EXP_DIR, param + '_raw')) and param != 'pump':
                             os.makedirs(os.path.join(EXP_DIR, param + '_raw'))
                             for x in range(len(fit['coefficients'])):
-                                exp_str = "Experiment: {0} vial {1}, {2}".format(EXP_NAME,
+                                exp_str = "Experiment: {0} vial {1}, {2}".format(settings.exp_name,
                                         x,
                                         time.strftime("%c"))
                                 self._create_file(x, param + '_raw', defaults=[exp_str])
@@ -443,7 +445,7 @@ class EvolverNamespace(BaseNamespace):
             os.makedirs(os.path.join(EXP_DIR, 'chemo_config'))
             setup_logging(log_name, quiet, verbose)
             for x in vials:
-                exp_str = "Experiment: {0} vial {1}, {2}".format(EXP_NAME,
+                exp_str = "Experiment: {0} vial {1}, {2}".format(settings.exp_name,
                                                                  x,
                                                            time.strftime("%c"))
                 # make OD file
@@ -452,7 +454,7 @@ class EvolverNamespace(BaseNamespace):
                 ## CUSTOM
                 # make stirrate file
                 self._create_file(x, 'stirrate', defaults=["Clock time,time elasped,stir_rate",
-                                                           "{0},{1},{2}".format(0,0,8)])
+                                                           "{0},{1},{2}".format(0,0,settings.stir_on_rate[x])])
                 # make stirrate file
                 self._create_file(x, 'OD_autocalib', 
                                   defaults=["time,od_plinear_90,od_plinear_135"])
@@ -512,7 +514,7 @@ class EvolverNamespace(BaseNamespace):
                 self.OD_initial = np.zeros(len(vials))
         else:
             # load existing experiment
-            pickle_name =  "{0}.pickle".format(EXP_NAME)
+            pickle_name =  "{0}.pickle".format(settings.exp_name)
             pickle_path = os.path.join(EXP_DIR, pickle_name)
             logger.info('loading previous experiment data: %s' % pickle_path)
             with open(pickle_path, 'rb') as f:
@@ -522,7 +524,7 @@ class EvolverNamespace(BaseNamespace):
             self.OD_initial = x[1]
 
         # copy current custom script to txt file
-        backup_filename = '{0}_{1}.txt'.format(EXP_NAME,
+        backup_filename = '{0}_{1}.txt'.format(settings.exp_name,
                                             time.strftime('%y%m%d_%H%M'))
         shutil.copy(os.path.join(SAVE_PATH, 'custom_script.py'), os.path.join(EXP_DIR,
                                                     backup_filename))
@@ -556,7 +558,7 @@ class EvolverNamespace(BaseNamespace):
     def save_variables(self, start_time, OD_initial):
         # save variables needed for restarting experiment later
         save_path = os.path.dirname(os.path.realpath(__file__))
-        pickle_name = "{0}.pickle".format(EXP_NAME)
+        pickle_name = "{0}.pickle".format(settings.exp_name)
         pickle_path = os.path.join(EXP_DIR, pickle_name)
         logger.debug('saving all variables: %s' % pickle_path)
         with open(pickle_path, 'wb') as f:
@@ -572,7 +574,7 @@ class EvolverNamespace(BaseNamespace):
         """
         Custom growth rate estimation function
         """
-        idx = np.where(~np.isnan(od))
+        idx = np.where(np.logical_and(~(np.isnan(od)), (od > 0)))
         if idx[0].size > 50:
             od = od[idx]
             time = time[idx]
@@ -673,6 +675,8 @@ class EvolverNamespace(BaseNamespace):
             custom_script.chemostat(self, data, vials, elapsed_time)
         elif mode == 'growthcurve':
             custom_script.growth_curve(self, data, vials, elapsed_time)
+        elif mode == 'calibration':
+            custom_script.calibration(self, data, vials, elapsed_time)            
         elif mode == 'growth_curve_stop_stir':
             custom_script.growth_curve_stop_stir(self, data, vials, elapsed_time)            
         else:
