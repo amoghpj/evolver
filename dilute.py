@@ -55,8 +55,8 @@ g = sns.relplot(data=fulldf, x="time", y="reading",
             facet_kws={"sharey":False})
 
 axes = g.fig.axes
-for sensor,axrow in zip(["90","135"],[axes[:4], axes[4:]]):
-    for ax, vial in zip(axrow, list(range(4))):
+for sensor,axrow in zip(["90","135"],[axes, axes]):
+    for ax, vial in zip(axrow, list(range(16))):
         for i, (idx, row) in enumerate(fulldf[(fulldf.sensor == sensor) & (fulldf.vial == vial) & (fulldf.pump > 0)].iterrows()):
             ax.axvline(row.time, color="k", alpha=0.4)
             ax.text(row.time, fulldf[(fulldf.sensor == sensor) & (fulldf.vial == vial) & (fulldf.time < row.time)].reading.median(), str(i))
@@ -67,7 +67,7 @@ plt.close()
 
 
 g = sns.relplot(data=fulldf, x="estimated_od", y="reading",
-            row="sensor",col="vial",hue="stirrate",
-            facet_kws={"sharey":False})
+                hue="sensor",col="vial",col_wrap=4,                
+                facet_kws={"sharey":False})
 #g.set(xscale="log")
 plt.savefig(f"{EXP_NAME}.png")

@@ -148,8 +148,8 @@ class Settings():
                 for key in ["turbidostat_low", "turbidostat_high"]:
                     if key not in per_vial_dict[vidx].keys():
                         bye(f"Missing {key} specification for vial {vidx}")
-                self.turbidostat_low[vidx] = per_vial_dict[vidx].get("chemo_start_od")
-                self.turbidostat_high[vidx] = per_vial_dict[vidx].get("chemo_start_time")                                
+                self.turbidostat_low[vidx] = per_vial_dict[vidx].get("turbidostat_low")
+                self.turbidostat_high[vidx] = per_vial_dict[vidx].get("turbidostat_high")                                
 
     def fmt(self, l, numtabs=0):
         sep = "".join(["\t"]*numtabs)
@@ -459,7 +459,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
             #if need to dilute to lower threshold, then calculate amount of time to pump
             if average_OD > ODset and collecting_more_curves:
 
-                time_in = - (np.log(lower_thresh[x]/average_OD)*VOLUME[x])/flow_rate[x]
+                time_in = - (np.log(lower_thresh[x]/average_OD)*settings.volume[x])/flow_rate[x]
 
                 if time_in > 20:
                     time_in = 20
