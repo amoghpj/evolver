@@ -165,7 +165,7 @@ class EvolverNamespace(BaseNamespace):
         
     def aj_convertod(self, od90, od135, x):
         try:
-            calib = pd.read_csv(f"{CALIB_NAME}.csv",index_col=0)
+            calib = pd.read_csv(f"{settings.calib_name}.csv",index_col=0)
             
         except Exception:
             #print("No calibration file found!")
@@ -574,10 +574,12 @@ class EvolverNamespace(BaseNamespace):
         """
         Custom growth rate estimation function
         """
-        idx = np.where(np.logical_and(~(np.isnan(od)), (od > 0)))
-        if idx[0].size > 50:
-            od = od[idx]
-            time = time[idx]
+        cond = np.logical_and(~(np.isnan(od)), (od > 0))
+        idx = cond
+        # idx = np.where(cond, od)
+        if idx.size > 50:
+            od = od[idx].values
+            time = time[idx].values
             model = LinearRegression()
             model.fit(time.reshape(-1,1), np.log(od))
             slope = model.coef_[0]
