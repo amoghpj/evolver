@@ -101,12 +101,12 @@ class Settings():
             for vidx in self.active_vials:
                 self.vials_to_run[vidx] = 1
             self.calibration_initial_od = [0.0]*16 ### TODO CHECK FOR BEHAVIOR
+            self.calibration_end_od = [0.0]*16 ### TODO CHECK FOR BEHAVIOR            
             for vidx in self.active_vials:
                 self.calibration_initial_od[vidx] = per_vial_dict[vidx].get("calib_initial_od")
-            
-            self.calibration_end_od = config["experiment_settings"]["operation"].get("end_od")
-            if self.calibration_end_od is None:
-                bye("Please specify global setting `end_od` in operation: calibration.")
+                self.calibration_end_od[vidx] = per_vial_dict[vidx].get("calib_end_od", None)
+                if self.calibration_end_od is None:
+                    bye("Please specify global setting `end_od` in operation: calibration.")
 
             self.calibration_num_pump_events = config["experiment_settings"]["operation"].get("num_pump_events", 20)
             
@@ -143,8 +143,9 @@ class Settings():
             """
             self.turbidostat_low = [9999]*16
             self.turbidostat_high = [9999]*16
-            
+            self.vials_to_run = [0]*16            
             for vidx in self.active_vials:
+                self.vials_to_run[vidx] = 1                
                 for key in ["turbidostat_low", "turbidostat_high"]:
                     if key not in per_vial_dict[vidx].keys():
                         bye(f"Missing {key} specification for vial {vidx}")
@@ -181,7 +182,7 @@ class Settings():
             s += f"Stir off durations: {self.fmt(self.stir_off_duration)}\n"             
         else:
             s += f"Switch stir rate: No\n"
-            s += f"Stir rate: {self.stir_on_rate}"
+            s += f"Stir rate: {self.stir_on_rate}\n"
         #s += f"Temperature: {self.temp_all}\n"                
         s += "--------------\n"        
         s += f'Vial Volumes : {self.fmt(self.volume)}\n'
@@ -292,13 +293,13 @@ def stir_rate_control(eVOLVER, vials, settings, elapsed_time):
               
 
         if currstir == settings.stir_on_rate[x]:
-            if data.shape[0] == settings.stir_on_duration[x]:
+            if data.shape[0] >= settings.stir_on_duration[x]:
                 newstir = settings.stir_off_rate[x]
                 update_stir_log(stir_path, elapsed_time, elapsed_time, newstir)
             else:
                 update_stir_log(stir_path, elapsed_time, currstirtime, settings.stir_on_rate[x])
         if currstir == settings.stir_off_rate[x]:
-            if data.shape[0] == settings.stir_off_duration[x]:
+            if data.shape[0] >= settings.stir_off_duration[x]:
                 newstir = settings.stir_on_rate[x]
                 update_stir_log(stir_path, elapsed_time, elapsed_time, newstir)
             else:
@@ -321,12 +322,13 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
 
     ## First define pump action.
     ## Modify this section to increase the dilution size
-    endOD = settings.calibration_end_od
+    #endOD = settings.calibration_end_od
     num_pump_events = settings.calibration_num_pump_events
-    volume_per_step = [vtr*vsleeve*( (od/endOD)**(1/num_pump_events) - 1)\
-                       if (od > 0) else 0 for vsleeve, od, vtr in zip(settings.volume,
-                                                                      settings.calibration_initial_od,
-                                                                      settings.vials_to_run)]
+    volume_per_step = [vtr*vsleeve*( (od/endod)**(1/num_pump_events) - 1)\
+                       if (od > 0) else 0 for vsleeve, endod, od, vtr in zip(settings.volume,
+                                                                             settings.calibration_end_od,
+                                                                             settings.calibration_initial_od,
+                                                                             settings.vials_to_run)]
     flow_rate = eVOLVER.get_flow_rate() #read from calibration file
 
     pump_run_duration = [volume_per_step[x]/flow_rate[x]
@@ -360,9 +362,9 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
                 MESSAGE[x+16] = "--"
 
         elif oddata.shape[0] == 10:
-            if pumpdata.shape[0] == num_pump_events:   ### This logic needs refinement
+            if pumpdata.shape[0] > num_pump_events:   ### This logic needs refinement
                 print("Ending calibration. Please measure ODs next.")
-                sys.exit()            
+                sys.exit()                                
             timein = round(pump_run_duration[x],2)
             MESSAGE[x] = str(timein)
             MESSAGE[x + 16] = "--"
@@ -380,7 +382,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
     turbidostat_vials = vials #vials is all 16, can set to different range (ex. [0,1,2,3]) to only trigger tstat on those vials
     stop_after_n_curves = np.inf #set to np.inf to never stop, or integer value to stop diluting after certain number of growth curves
-    OD_values_to_average = 6  # Number of values to calculate the OD average
+    OD_values_to_average = 50  # Number of values to calculate the OD average
 
     lower_thresh = settings.turbidostat_low #[0.2] * len(vials) #to set all vials to the same value, creates 16-value list
     upper_thresh = settings.turbidostat_high # [0.6] * 16
@@ -402,29 +404,62 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
     # fluidic message: initialized so that no change is sent
     MESSAGE = ['--'] * 48
     newstirrates = []
+
+    num_pump_events = 20 # settings.calibration_num_pump_events
+
+    pumplogs = [os.path.join(eVOLVER.exp_dir, settings.exp_name,
+                                            "pump_log", f"vial{x}_pump_log.txt")
+                for x in vials]    
+    volume_per_step = [vtr*vsleeve*( (highod/lowod)**(1/num_pump_events) - 1)\
+                       if (highod > 0) else 0 for vsleeve, lowod, highod, vtr in zip(settings.volume,
+                                                                      settings.turbidostat_low,
+                                                                      settings.turbidostat_high,
+                                                                                     settings.vials_to_run)]
+    WINSIZE = 100
     for x in turbidostat_vials: #main loop through each vial
         # Update turbidostat configuration files for each vial
         # initialize OD and find OD path
 
+        if settings.stir_switch:
+            stirdf = pd.read_csv(os.path.join(eVOLVER.exp_dir, settings.exp_name,
+                                              'stirrate', f"vial{x}_stirrate.txt"),
+                                 sep=",", )
         file_name =  "vial{0}_ODset.txt".format(x)
+        
         ODset_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'ODset', file_name)
         data = np.genfromtxt(ODset_path, delimiter=',')
         ODset = data[len(data)-1][1]
         ODsettime = data[len(data)-1][0]
         num_curves=len(data)/2;
-
+        
         if settings.calib_name is not None:
             file_name =  "vial{0}_OD_autocalib.txt".format(x)
             OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD_autocalib', file_name)
         else:
             file_name =  "vial{0}_OD.txt".format(x)
             OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD', file_name)            
-
+        data =  pd.read_csv(OD_path,sep=",")#eVOLVER.tail_to_np(OD_path, OD_values_to_average)
+        
+        if settings.estimate_gr:
+            if settings.stir_switch:
+                grdata = data.merge(stirdf, left_on="time", right_on="Clock time")
+                grdata = grdata[grdata.stir_rate == 0]
+            else:
+                grdata = data
+            if settings.calib_name:
+                ODdata_forgr = grdata.loc[-WINSIZE:, "od_plinear_135"]
+                time = data.loc[-WINSIZE:,"time"]            
+            else:
+                ODdata_forgr = grdata.loc[-WINSIZE:, 1]
+                time = data.loc[-WINSIZE:,0]            
+            eVOLVER.aj_growth_rate(x, time, ODdata_forgr)        
+        ###
+        
         ## Custom
 
         file_name =  "vial{0}_od_90_raw.txt".format(x)
         OD90_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'od_90_raw', file_name)        
-        data =  eVOLVER.tail_to_np(OD_path, OD_values_to_average)        
+
         sensordata = pd.read_csv(OD90_path,
                              sep=",",names=["elapsed_time","od"],
                                 skiprows=[0]
@@ -436,7 +471,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
         if data.size != 0:
             # Take median to avoid outlier
-            od_values_from_file = data[:,1]    # Use only od90 if using ODac
+            od_values_from_file = data.od_plinear_135.values    # Use only od135 if using ODac
             average_OD = float(np.median(od_values_from_file))
 
             #if recently exceeded upper threshold, note end of growth curve in ODset, allow dilutions to occur and growthrate to be measured
@@ -450,7 +485,8 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
                 eVOLVER.calc_growth_rate(x, ODsettime, elapsed_time)
 
             #if have approx. reached lower threshold, note start of growth curve in ODset
-            if (average_OD < (lower_thresh[x] + (upper_thresh[x] - lower_thresh[x]) / 3)) and (ODset != upper_thresh[x]):
+            # if (average_OD < (lower_thresh[x] + (upper_thresh[x] - lower_thresh[x]) / 3)) and (ODset != upper_thresh[x]):
+            if (np.median(data.od_plinear_135.tail(10)) <= lower_thresh[x] ) and (ODset != upper_thresh[x]):                
                 text_file = open(ODset_path, "a+")
                 text_file.write("{0},{1}\n".format(elapsed_time, upper_thresh[x]))
                 text_file.close()
@@ -458,32 +494,54 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
             #if need to dilute to lower threshold, then calculate amount of time to pump
             if average_OD > ODset and collecting_more_curves:
+                t_crossing = data[data.od_plinear_135 > ODset].time.values[0]
+                
+                # Old turbidostat logic
+                # time_in = - (np.log(lower_thresh[x]/average_OD)*settings.volume[x])/flow_rate[x]
 
-                time_in = - (np.log(lower_thresh[x]/average_OD)*settings.volume[x])/flow_rate[x]
+                # if time_in > 20:
+                #     time_in = 20
 
-                if time_in > 20:
-                    time_in = 20
+                # time_in = round(time_in, 2)
 
-                time_in = round(time_in, 2)
+                # file_name =  "vial{0}_pump_log.txt".format(x)
+                # file_path = os.path.join(eVOLVER.exp_dir, settings.exp_name,
+                #                          'pump_log', file_name)
+                # data = np.genfromtxt(file_path, delimiter=',')
+                # last_pump = data[len(data)-1][0]
 
-                file_name =  "vial{0}_pump_log.txt".format(x)
-                file_path = os.path.join(eVOLVER.exp_dir, settings.exp_name,
-                                         'pump_log', file_name)
-                data = np.genfromtxt(file_path, delimiter=',')
-                last_pump = data[len(data)-1][0]
-                if ((elapsed_time - last_pump)*60) >= pump_wait: # if sufficient time since last pump, send command to Arduino
-                    logger.info('turbidostat dilution for vial %d' % x)
-                    # influx pump
-                    MESSAGE[x] = str(time_in)
-                    # efflux pump
-                    MESSAGE[x + 16] = str(time_in + time_out)
+                pumpdata = pd.read_csv(pumplogs[x],
+                                       sep=",",names=["elapsed_time","last_pump"],
+                                       skiprows=[0])
+                last_pump = pumpdata.iloc[-1,0]
+                oddata = data[data.elapsed_time > t_crossing]
+                if oddata.shape[0] == 9:                
+                    MESSAGE[x] = "--"
+                    if settings.vials_to_run[x] == 1:
+                        MESSAGE[x+16] = str(15)
+                    else:
+                        MESSAGE[x+16] = "--"
 
-                    file_name =  "vial{0}_pump_log.txt".format(x)
-                    file_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'pump_log', file_name)
+                elif oddata.shape[0] == 10:
+                    timein = round(pump_run_duration[x],2)
+                    MESSAGE[x] = str(timein)
+                    MESSAGE[x + 16] = "--"
 
-                    text_file = open(file_path, "a+")
-                    text_file.write("{0},{1}\n".format(elapsed_time, time_in))
-                    text_file.close()
+                    with open(pumplogs[x], "a+") as outfile:
+                        outfile.write(f"{elapsed_time},{timein}\n")                        
+                # if ((elapsed_time - last_pump)*60) >= pump_wait: # if sufficient time since last pump, send command to Arduino
+                #     logger.info('turbidostat dilution for vial %d' % x)
+                #     # influx pump
+                #     MESSAGE[x] = str(time_in)
+                #     # efflux pump
+                #     MESSAGE[x + 16] = str(time_in + time_out)
+
+                #     file_name =  "vial{0}_pump_log.txt".format(x)
+                #     file_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'pump_log', file_name)
+
+                #     text_file = open(file_path, "a+")
+                #     text_file.write("{0},{1}\n".format(elapsed_time, time_in))
+                #     text_file.close()
         else:
             logger.debug('not enough OD measurements for vial %d' % x)
 
