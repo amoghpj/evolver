@@ -13,7 +13,7 @@ f.close()
 EXP_NAME = config["experiment_settings"]["exp_name"]
 CALIB_NAME = config["experiment_settings"]["calib_name"]
 stirswitch = config["experiment_settings"]["stir_settings"]["stir_switch"]
-active_vials = [pvs["vial"] for pvs in config["experiment_settings"]["per_vial_settings"]]
+active_vials = [pvs["vial"] for pvs in config["experiment_settings"]["per_vial_settings"] if pvs["to_run"]]
 
 plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
              "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
@@ -96,12 +96,12 @@ for plotthis in plotthese.keys():
                 _df = _df.melt(id_vars=["time","vial","stir rate"], value_vars=["od_plinear_90",
                                                                                 "od_plinear_135"],
                                                   var_name="sensor", value_name="inferred OD").dropna()
+                sns.set_style("ticks",{'axes.grid' : True})                
                 g = sns.relplot(data=_df, x="time",
                                 y="inferred OD",style="stir rate",
                                 col="vial", col_wrap=4,
                                 hue="sensor", kind="line")
-                plt.grid()
-                plt.xscale("log", base=2)
+
                 plt.yscale("log", base=2)
                 #g.set(yscale="log")
             else:

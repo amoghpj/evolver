@@ -62,9 +62,18 @@ class Settings():
                 self.stir_on_duration = [0] * 16
                 self.stir_off_duration = [0] * 16                
                 for vidx in self.active_vials:
-                    self.stir_off_rate[vidx] = config["experiment_settings"]["stir_settings"]["stir_off_rate"]                
-                    self.stir_on_duration[vidx] = config["experiment_settings"]["stir_settings"].get("stir_on_duration", 0)
-                    self.stir_off_duration[vidx] = config["experiment_settings"]["stir_settings"].get("stir_off_duration", 0)
+                    self.stir_on_rate[vidx] = per_vial_dict[vidx].get("stir_on_rate",
+                                                                      config["experiment_settings"]["stir_settings"]["stir_on_rate"])
+                    print(per_vial_dict[vidx])
+                    self.stir_off_rate[vidx] = per_vial_dict[vidx].get("stir_off_rate",
+                                                                       config["experiment_settings"]["stir_settings"]["stir_off_rate"])
+                    
+                    self.stir_on_duration[vidx] = per_vial_dict[vidx].get("stir_on_duration",
+                                                                          config["experiment_settings"]["stir_settings"].get("stir_on_duration", 0))
+                                                                          
+                    self.stir_off_duration[vidx] = per_vial_dict[vidx].get("stir_off_duration",
+                                                                           config["experiment_settings"]["stir_settings"].get("stir_off_duration", 0))
+                
             
         # Global temperature handling
         if config["experiment_settings"].get("temp_all") is not None:
@@ -101,12 +110,17 @@ class Settings():
             for vidx in self.active_vials:
                 self.vials_to_run[vidx] = 1
             self.calibration_initial_od = [0.0]*16 ### TODO CHECK FOR BEHAVIOR
-            self.calibration_end_od = [0.0]*16 ### TODO CHECK FOR BEHAVIOR            
+            self.calibration_end_od = [0.0]*16 ### TODO CHECK FOR BEHAVIOR
+            self.calibration_fold_range = config["experiment_settings"]["operation"].get("fold_calibration", np.nan)
+            self.calibration_measured_od = config["experiment_settings"]["operation"].get("measured_od")
+            
             for vidx in self.active_vials:
                 self.calibration_initial_od[vidx] = per_vial_dict[vidx].get("calib_initial_od")
                 self.calibration_end_od[vidx] = per_vial_dict[vidx].get("calib_end_od", None)
-                if self.calibration_end_od is None:
-                    bye("Please specify global setting `end_od` in operation: calibration.")
+                if self.calibration_end_od[vidx] is None and not np.isnan(self.calibration_fold_range):
+                    self.calibration_end_od[vidx] = self.calibration_initial_od[vidx]/self.calibration_fold_range
+                # if self.calibration_end_od is None:
+                #     bye("Please specify global setting `end_od` in operation: calibration.")
 
             self.calibration_num_pump_events = config["experiment_settings"]["operation"].get("num_pump_events", 20)
             
@@ -297,12 +311,14 @@ def stir_rate_control(eVOLVER, vials, settings, elapsed_time):
                 newstir = settings.stir_off_rate[x]
                 update_stir_log(stir_path, elapsed_time, elapsed_time, newstir)
             else:
+                newstir = settings.stir_on_rate[x]
                 update_stir_log(stir_path, elapsed_time, currstirtime, settings.stir_on_rate[x])
         if currstir == settings.stir_off_rate[x]:
             if data.shape[0] >= settings.stir_off_duration[x]:
                 newstir = settings.stir_on_rate[x]
                 update_stir_log(stir_path, elapsed_time, elapsed_time, newstir)
             else:
+                newstir = settings.stir_off_rate[x]                
                 update_stir_log(stir_path, elapsed_time, currstirtime, settings.stir_off_rate[x])
 
         newstirrates[x] = newstir
@@ -323,7 +339,14 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
     ## First define pump action.
     ## Modify this section to increase the dilution size
     #endOD = settings.calibration_end_od
-    num_pump_events = settings.calibration_num_pump_events
+
+
+    #######
+    num_pump_events = settings.calibration_num_pump_events + 1 ##### VERY IMPORTANT LOGIC
+    ## This is set to +1 because the pump log file is initialized with a zero time point line.
+    ## This makes the logic a little messy.
+    
+    
     volume_per_step = [vtr*vsleeve*( (od/endod)**(1/num_pump_events) - 1)\
                        if (od > 0) else 0 for vsleeve, endod, od, vtr in zip(settings.volume,
                                                                              settings.calibration_end_od,
@@ -354,6 +377,14 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
         last_pump = pumpdata.iloc[-1,0]
         timein = 0
         oddata = oddata[oddata.elapsed_time > last_pump]
+
+        if (pumpdata.shape[0] == num_pump_events) and (not settings.calibration_measured_od):
+            print("Ending calibration. Please measure ODs next.")            
+            sys.exit()
+        if (oddata.shape[0] == 10) and (settings.calibration_measured_od):
+            print("Calibration done.")
+            sys.exit()
+            
         if oddata.shape[0] == 9:                
             MESSAGE[x] = "--"
             if settings.vials_to_run[x] == 1:
@@ -361,10 +392,8 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
             else:
                 MESSAGE[x+16] = "--"
 
+            
         elif oddata.shape[0] == 10:
-            if pumpdata.shape[0] > num_pump_events:   ### This logic needs refinement
-                print("Ending calibration. Please measure ODs next.")
-                sys.exit()                                
             timein = round(pump_run_duration[x],2)
             MESSAGE[x] = str(timein)
             MESSAGE[x + 16] = "--"
@@ -439,22 +468,23 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
             file_name =  "vial{0}_OD.txt".format(x)
             OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD', file_name)            
         data =  pd.read_csv(OD_path,sep=",")#eVOLVER.tail_to_np(OD_path, OD_values_to_average)
-        
-        if settings.estimate_gr:
-            if settings.stir_switch:
-                grdata = data.merge(stirdf, left_on="time", right_on="Clock time")
-                grdata = grdata[grdata.stir_rate == 0]
-            else:
-                grdata = data
-            if settings.calib_name:
-                ODdata_forgr = grdata.loc[-WINSIZE:, "od_plinear_135"]
-                time = data.loc[-WINSIZE:,"time"]            
-            else:
-                ODdata_forgr = grdata.loc[-WINSIZE:, 1]
-                time = data.loc[-WINSIZE:,0]            
-            eVOLVER.aj_growth_rate(x, time, ODdata_forgr)        
-        ###
-        
+        try:
+            if settings.estimate_gr and data.shape[0] > 2*WINSIZE:
+                if settings.stir_switch:
+                    grdata = data.merge(stirdf, left_on="time", right_on="Clock time")
+                    grdata = grdata[grdata.stir_rate == 0]
+                else:
+                    grdata = data
+                if settings.calib_name:
+                    ODdata_forgr = grdata.loc[-WINSIZE:, "od_plinear_135"]
+                    time = grdata.loc[-WINSIZE:,"time"]            
+                else:
+                    ODdata_forgr = grdata.loc[-WINSIZE:, 1]
+                    time = grdata.loc[-WINSIZE:,0]            
+                eVOLVER.aj_growth_rate(x, time, ODdata_forgr)
+        except:
+            print("Problem with growth rate estimation")
+            
         ## Custom
 
         file_name =  "vial{0}_od_90_raw.txt".format(x)

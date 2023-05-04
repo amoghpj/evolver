@@ -25,16 +25,7 @@ f.close()
 # only change if you wish to have multiple data folders within a single
 # directory for a set of scripts
 EXP_NAME = config["experiment_settings"]["exp_name"]
-CALIB_NAME = config["experiment_settings"]["calib_name"]
 OPERATION_MODE = config["experiment_settings"]["operation"]["mode"]
-
-if config["experiment_settings"]["stir_all"] is not None:
-    stir = config["experiment_settings"]["stir_all"]
-    STIR_INITIAL = [stir]*16
-
-if config["experiment_settings"]["temp_all"] is not None:
-    temp = config["experiment_settings"]["temp_all"]
-    TEMP_INITIAL = [temp]*16
 
 VIALS_TO_RUN = []
 VOLUME = []
@@ -47,36 +38,30 @@ CHEMO_START_TIME = []
 
 if config["experiment_settings"]["operation"]["mode"] == "calibration":
     settings = config["experiment_settings"]["operation"]
-    CALIBRATION_END_OD = settings["end_od"]
     for vial in config["experiment_settings"]["per_vial_settings"]:
+        if vial["to_run"]:
+            VIALS_TO_RUN.append(1)
+        else:
+            VIALS_TO_RUN.append(0)
+        VOLUME.append(vial["volume"])
         if vial["to_run"] is True:    
             CALIBRATION_INITIAL_OD.append(vial["calib_initial_od"])
+            CALIBRATION_END_OD.append(vial["calib_end_od"])            
         else:
             CALIBRATION_INITIAL_OD.append(0)
+            CALIBRATION_END_OD.append(0)
     CALIBRATION_NUM_PUMP_EVENTS = settings["num_pump_events"]
     
 num_pump_events= CALIBRATION_NUM_PUMP_EVENTS
 
-for vial in config["experiment_settings"]["per_vial_settings"]:
-    if vial["to_run"] is True:
-        VIALS_TO_RUN.append(1)
-        VOLUME.append(vial["volume"])
-        CHEMO_RATE.append(vial["chemo_rate"])
-        CHEMO_START_OD.append(vial["chemo_start_od"])
-        CHEMO_START_TIME.append(vial["chemo_start_time"])
-    else:
-        VIALS_TO_RUN.append(0)
-        VOLUME.append(vial["volume"])
-        CHEMO_RATE.append(np.nan)
-        CHEMO_START_OD.append(np.nan)
-        CHEMO_START_TIME.append(np.nan)
-
-if type(CALIBRATION_END_OD) is float:
-    finalod = [CALIBRATION_END_OD]*16
-else:
-    finalod = [CALIBRATION_END_OD]
+# if type(CALIBRATION_END_OD) is float:
+#     finalod = [CALIBRATION_END_OD]*16
+# else:
+    # finalod = [CALIBRATION_END_OD]
+finalod  = CALIBRATION_END_OD    
 print(VOLUME)
 print(CALIBRATION_INITIAL_OD)
+print(finalod)
 dflist = []
 for sensor, vial in product(["90","135"], range(16)):
     if VIALS_TO_RUN[vial] == 1:
@@ -96,9 +81,12 @@ for sensor, vial in product(["90","135"], range(16)):
         print(bolus)
         prevtime = 0
         pumpdf = pumpdf.reset_index(drop=True)
+        print(pumpdf)
         pumpeventidx = pumpdf.index.values
+        print(pumpeventidx)
         for dil, (i, row) in enumerate(pumpdf.iterrows()):
             df.loc[df.time == row.time, "pump"] = row.pump
+            print(dil, row)
             if len(pumpeventidx) < dil + 2:
                 df.loc[df.time > row.time, "dilevent"] = dil
                 df.loc[df.time > row.time, "estimated_od"] = CALIBRATION_INITIAL_OD[vial]*(VOLUME[vial]/(VOLUME[vial] + bolus))**(dil)
@@ -132,6 +120,6 @@ calibdf = calibdf.merge(calibdf.loc[(calibdf.sensor == "135")\
 calibdf["estimated_od_inflection"] = calibdf["estimated_od_inflection"] - INFLECTION_CORRECTION
 calibdf["prevod"] = calibdf.groupby(["vial","sensor"]).estimated_od.shift(1)
 calibdf["prevreading"] = calibdf.groupby(["vial","sensor"]).reading.shift(1)
-# calibdf = calibdf[calibdf.prevod > 0]
+calibdf = calibdf[calibdf.prevod > 0]
 calibdf = calibdf.dropna()
 calibdf.to_csv(f"{EXP_NAME}.csv")
