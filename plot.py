@@ -13,7 +13,7 @@ f.close()
 EXP_NAME = config["experiment_settings"]["exp_name"]
 CALIB_NAME = config["experiment_settings"]["calib_name"]
 stirswitch = config["experiment_settings"]["stir_settings"]["stir_switch"]
-active_vials = [pvs["vial"] for pvs in config["experiment_settings"]["per_vial_settings"] if pvs["to_run"]]
+active_vials = [pvs["vial"] for pvs in config["experiment_settings"]["per_vial_settings"]]
 
 plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
              "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
@@ -97,13 +97,22 @@ for plotthis in plotthese.keys():
                                                                                 "od_plinear_135"],
                                                   var_name="sensor", value_name="inferred OD").dropna()
                 sns.set_style("ticks",{'axes.grid' : True})                
+                g = sns.relplot(data=_df[_df.sensor == yvar], x="time",
+                                y="inferred OD",style="stir rate",
+                                col="vial", col_wrap=4,
+                                hue="sensor", kind="line")
+                print(config["experiment_settings"]["operation"])
+                if config["experiment_settings"]["operation"]["mode"] == "turbidostat":
+                    for i, ax in enumerate(g.axes.flatten()):
+                        ax.axhline(config["experiment_settings"]["per_vial_settings"][i]["turbidostat_high"], color="k")
+                        ax.axhline(config["experiment_settings"]["per_vial_settings"][i]["turbidostat_low"], color="r")                        
+                plt.savefig(f"{EXP_NAME}-{plotthis}-linear.png")
+                plt.close()
                 g = sns.relplot(data=_df, x="time",
                                 y="inferred OD",style="stir rate",
                                 col="vial", col_wrap=4,
                                 hue="sensor", kind="line")
-
-                plt.yscale("log", base=2)
-                #g.set(yscale="log")
+                plt.yscale("log", base=2)                
             else:
                 _df = df[df.datatype == plotthis].melt(id_vars=["time","vial"], value_vars=["od_plinear_90",
                                                                               "od_plinear_135"],
@@ -113,6 +122,24 @@ for plotthis in plotthese.keys():
                                 col="vial", col_wrap=4,
                                 hue="sensor", kind="line")            
 
+        elif "growth" in plotthis:
+            if stirswitch:
+                _df = df[df.datatype == plotthis][["time", yvar, "vial"]].merge(df[df.datatype=="stirrate"][["time","stir rate","vial"]], on=["time","vial"])
+                if _df.shape[0] > 0:
+                    _df = _df[(_df[yvar] < 1) & (_df[yvar] > 0 )]
+                    _df["Doubling time (hr)"] = 1/_df[yvar]
+                    _df = _df[_df["Doubling time (hr)"] < 50]
+                    g = sns.relplot(data=_df, x="time",
+                                    y="Doubling time (hr)",
+                                    hue="vial",
+                                    style="stir rate", kind="line")            
+
+            else:
+                g = sns.relplot(data=df[df.datatype == plotthis], x="time",
+                                y=yvar,
+                                col="vial", col_wrap=4,
+                                hue="vial", kind="line")                        
+            
         else:
             if stirswitch:
                 _df = df[df.datatype == plotthis][["time", yvar, "vial"]].merge(df[df.datatype=="stirrate"][["time","stir rate","vial"]], on=["time","vial"])
@@ -127,6 +154,4 @@ for plotthis in plotthese.keys():
                                 y=yvar,
                                 col="vial", col_wrap=4,
                                 hue="vial", kind="line")            
-        # if "raw" not in plotthis:
-        #     g.set(yscale="log")
         plt.savefig(f"{EXP_NAME}-{plotthis}.png")
