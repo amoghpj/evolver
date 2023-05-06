@@ -21,7 +21,7 @@ VIALS_TO_RUN = []
 for vial in config["experiment_settings"]["per_vial_settings"]:
     startOD.append(vial["calib_initial_od"])
     VOLUME.append(vial["volume"])
-    if config["experiment_settings"]["operation"]["fold_calibration"]:
+    if config["experiment_settings"]["operation"].get("fold_calibration", False):
         endOD.append(vial["calib_initial_od"]/config["experiment_settings"]["operation"]["fold_calibration"])
         
     else:
