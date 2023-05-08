@@ -24,3 +24,13 @@ eVOLVER.py.  [[file:eVOLVER.py::import custom_script from custom_script import E
   away from using per-vial logic in a loop like it is currently setup.
 - Define defaults for stirring control that are passed explicitly to each function definition
 
+* Calibration strategy
+  We can perform an in-vial calibration by diluting out a dense culture by
+  dispensing media of fixed volumes repeatedly.  Interestingly, performing a
+  100X dilution in steps uses far less media than doing it in a single step.
+  The total volume of media consumed as the bolus size → 0 is - volume_vial * log(endOD/startOD).
+
+  Below is a visual depiction of the relationship between bolus size, number of steps needed to
+  hit endOD, and the total volume dispensed. 
+  
+  [[file:img/example-fractional-dilution-cumulative-volume-dependence.png]]
