@@ -16,7 +16,7 @@ def write_config_to_file(config):
         outfile.write(cyaml)
 
 if __name__ == '__main__':
-    exps = [f for f in os.listdir("./") if (os.path.isdir(f) and f != "__pycache__")]
+    exps = [f for f in os.listdir("./") if (os.path.isdir(f) and f not in  ["__pycache__", "img",".git"])]
     exps.append("Setup")
     page = st.sidebar.selectbox('Experiments..',exps)
     st.title(f"{page}")
@@ -41,7 +41,6 @@ if __name__ == '__main__':
               }
 
     if page == "Setup":
-        
         with st.form("global_setup"):
             st.header("Global settings")
             exp_name = st.text_input("Experiment name")
@@ -68,6 +67,7 @@ if __name__ == '__main__':
             st.form_submit_button()
         config["experiment_settings"]["ip"] = ipdict[ip]
         config["experiment_settings"]["exp_name"] = str(exp_name)
+        config["experiment_settings"]["temp_all"] = temperature
         if calib != "":
             config["experiment_settings"]["calib_name"] = calib
 
@@ -117,11 +117,19 @@ if __name__ == '__main__':
                  "turbidostat_high":row.turbidostat_high,
                  })
         print(editeddf)
-        st.button("Write configuration to file", on_click= write_config_to_file(config))
+        write_config = False
+        write_config = st.button("Write configuration to file")
+        if write_config:
+            write_config_to_file(config)
     else:
-        f = open("example_experiment_parameters.yaml","r")
-        config = yaml.safe_load(f)
-        f.close()
+        if os.path.exists("experiment_parameters.yaml"):
+            f = open("experiment_parameters.yaml","r")
+            config = yaml.safe_load(f)
+            f.close()
+        elif os.path.exists("example_experiment_parameters.yaml"):
+            f = open("experiment_parameters.yaml","r")
+            config = yaml.safe_load(f)
+            f.close()
         try:
             calib = Image.open(f"{page}.png")
             st.image(calib, )
@@ -131,8 +139,8 @@ if __name__ == '__main__':
             for suff in ["-od_135_raw",
                         "-od_90_raw",
                         "-OD",
+                        "_projection",                         
                         "-OD_autocalib",
-                        "_projection",
                         "-growthrate_fromOD"]:
                 st.header(suff[1:])
                 st.image(Image.open(f"{page}{suff}.png"))

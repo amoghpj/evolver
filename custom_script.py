@@ -444,7 +444,12 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
                                                                       settings.turbidostat_low,
                                                                       settings.turbidostat_high,
                                                                                      settings.vials_to_run)]
-    WINSIZE = 100
+
+    
+    if settings.calib_name is not None:
+        calibration = pd.read_csv(os.path.join(eVOLVER.exp_dir, f"{settings.calib_name}.csv"))
+
+    WINSIZE = 100        
     for x in turbidostat_vials: #main loop through each vial
         # Update turbidostat configuration files for each vial
         # initialize OD and find OD path
@@ -464,10 +469,19 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
         if settings.calib_name is not None:
             file_name =  "vial{0}_OD_autocalib.txt".format(x)
             OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD_autocalib', file_name)
+            data =  pd.read_csv(OD_path,sep=",",)
+            inflectionpoint = calibration[calibration.vial == x].estimated_od_inflection.unique()[0]
+            if inflectionpoint - np.median(data.od_plinear_135.values[-50:])  < 0.175:
+                ## If we are close to the 135 inflection point, switch to 90
+                sensor_to_use = "od_plinear_90"
+                data["OD"] = data.od_plinear_90
+            else:
+                sensor_to_use = "od_plinear_135"
+                data["OD"] = data.od_plinear_135
         else:
             file_name =  "vial{0}_OD.txt".format(x)
             OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD', file_name)            
-        data =  pd.read_csv(OD_path,sep=",")#eVOLVER.tail_to_np(OD_path, OD_values_to_average)
+            data =  pd.read_csv(OD_path,sep=",", skiprows=[0],names=["time","OD"])
         try:
             if settings.estimate_gr and data.shape[0] > 2*WINSIZE:
                 if settings.stir_switch:
@@ -476,7 +490,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
                 else:
                     grdata = data
                 if settings.calib_name:
-                    ODdata_forgr = grdata.loc[-WINSIZE:, "od_plinear_135"]
+                    ODdata_forgr = grdata.loc[-WINSIZE:, sensor_to_use]
                     time = grdata.loc[-WINSIZE:,"time"]            
                 else:
                     ODdata_forgr = grdata.loc[-WINSIZE:, 1]
@@ -501,7 +515,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
         if data.size != 0:
             # Take median to avoid outlier
-            od_values_from_file = data.od_plinear_135.values    # Use only od135 if using ODac
+            od_values_from_file = data.OD.values    # Use only od135 if using ODac
             average_OD = float(np.median(od_values_from_file))
 
             #if recently exceeded upper threshold, note end of growth curve in ODset, allow dilutions to occur and growthrate to be measured
@@ -516,7 +530,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
             #if have approx. reached lower threshold, note start of growth curve in ODset
             # if (average_OD < (lower_thresh[x] + (upper_thresh[x] - lower_thresh[x]) / 3)) and (ODset != upper_thresh[x]):
-            if (np.median(data.od_plinear_135.tail(10)) <= lower_thresh[x] ) and (ODset != upper_thresh[x]):                
+            if (np.median(data.OD.tail(10)) <= lower_thresh[x] ) and (ODset != upper_thresh[x]):                
                 text_file = open(ODset_path, "a+")
                 text_file.write("{0},{1}\n".format(elapsed_time, upper_thresh[x]))
                 text_file.close()
@@ -524,7 +538,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
             #if need to dilute to lower threshold, then calculate amount of time to pump
             if average_OD > ODset and collecting_more_curves:
-                t_crossing = data[data.od_plinear_135 > ODset].time.values[0]
+                t_crossing = data[data.OD > ODset].time.values[0]
                 
                 # Old turbidostat logic
                 # time_in = - (np.log(lower_thresh[x]/average_OD)*settings.volume[x])/flow_rate[x]
