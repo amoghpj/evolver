@@ -119,7 +119,7 @@ if __name__ == '__main__':
         print(editeddf)
         st.button("Write configuration to file", on_click= write_config_to_file(config))
     else:
-        f = open("experiment_parameters.yaml","r")
+        f = open("example_experiment_parameters.yaml","r")
         config = yaml.safe_load(f)
         f.close()
         try:

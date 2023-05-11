@@ -379,7 +379,7 @@ def calibration(eVOLVER, input_data, vials, elapsed_time):
         oddata = oddata[oddata.elapsed_time > last_pump]
 
         if (pumpdata.shape[0] == num_pump_events) and (not settings.calibration_measured_od):
-            print("Ending calibration. Please measure ODs next.")            
+            print("Ending calibration. Please insert tubes to measure ODs next.")            
             sys.exit()
         if (oddata.shape[0] == 10) and (settings.calibration_measured_od):
             print("Calibration done.")
