@@ -141,6 +141,7 @@ if __name__ == '__main__':
                         "-OD",
                         "_projection",                         
                         "-OD_autocalib",
+                        "-OD_autocalib-linear",                         
                         "-growthrate_fromOD"]:
                 st.header(suff[1:])
                 st.image(Image.open(f"{page}{suff}.png"))

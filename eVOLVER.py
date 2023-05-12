@@ -194,12 +194,23 @@ class EvolverNamespace(BaseNamespace):
                 return(transformed)
             else:
                 return(np.nan)
-        odinflection = calib.estimated_od_inflection.unique()[0]
+        #odinflection = calib.estimated_od_inflection.unique()[0]
+        
         od_plinear_90 = getestod(od90, calib, "90")
-        od_plinear_135 = "NaN"
-        if od_plinear_90 < odinflection:
+        
+        infl_135 = calib[(calib.vial == x) &\
+                              (calib.sensor ==  135)].reading_inflection.unique()[0]
+        infl_od = calib[(calib.vial == x) &\
+                              (calib.sensor ==  135)].estimated_od_inflection.unique()[0]        
+        print(infl_135)
+        print(od135)
+        if (od135 > infl_135) and od_plinear_90 < infl_od :
             od_plinear_135 = getestod(od135, calib,  "135")
+        else:
+            od_plinear_135 = "NaN"            
 
+        # if od_plinear_90 < odinflection:
+        #     od_plinear_135 = getestod(od135, calib,  "135")
         return([od_plinear_90, od_plinear_135])
 
     def transform_data(self, data, vials, od_cal, temp_cal):
