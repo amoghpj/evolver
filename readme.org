@@ -1,3 +1,47 @@
+* Experiment setup instructions
+1. Autoclave vials with lids on.
+   1. For "open" vials, it is not necessary to autoclave the needles.
+2. Clean lines with sterile water (20s), and 70% ethanol (20s).
+3. Weigh empty vials, note OD of (optional: washed) dense cultures.
+4. Fill each vial with 25mL of media. Connect and run efflux lines with cleaned efflux needles. Weigh final culture volumes.
+5. Once vials are connected to the fluid lines set up the experiment.
+
+Setting up the experiment:
+1. Open up an =iterm2= terminal (Command+space iterm2).
+2. We use =bash= instead of the default terminal. Type in =bash= and hit return.
+   1. If this was done right, the prompt should change, and should be preceded by something like =(py37)= which indicates that the virtual environment has been loaded.
+3. In the file browser ("finder"), navigate to =Documents/dpu/experiments/=.
+4. Duplicate the =evolver/= folder, and name the duplicate with a descriptive name.
+   Typically =YYYY_MM_DD_keywords_separted_by_underscore=.
+5. Switch back to the terminal window and type in =cd ~/Documents/dpu/experiment/NAME_OF_YOUR_NEW_DIRECTORY=
+6. Start the visual interface to populate the configuration file by
+   typing in =streamlit run visualize.py=.  This will return a
+   localhost IP address with a port. Copy and paste this in a browser
+   window.
+7. Populate all the fields, and press 'Write to configuration
+   file'. NOTE: If you are running a calibration, or if you are not planning
+   on using a calibration file, LEAVE THE "Calibration name" field
+   BLANK!!!
+8. Alternative approach: The folder has an
+   =example_experiment_parameters.yaml= file. Edit the contents of
+   this file and save it to a file called =experiment_parameters.yaml=
+   in the same directory.
+9. If you are running a calibration:
+   1. Include the word "-calibration" in the experiment name.
+   2. Open a new terminal window, load bash, navigate to the experiment folder, and start the calibration by typing in =python eVOLVER.py=.  This will display the calibration settings. 
+      When prompted about blanking vials, type n.
+   3. The calibration will stop at the last step. Collect the efflux from each tube.  Select all the vials
+      from the Rpi touch interface on the eVOLVER and run the efflux for
+      10s. Measure the ODs. *Multiply the ODs with a factor of 1.2 if
+      measuring efflux culture.*
+   4. Go back to the web interface, update the =calib_end_od= with the new ODs, write this to file again. NB: The old file will be automatically renamed and time stamped.
+   5. Open a new terminal, load bash, navigate to the experiment directory as in STEP 5.
+   6. Type in  =python write_calibration_to_file.py=. This will create a CSV file with the name of the calibration experiment, the same as the experiment name.
+   7. Next, switch back to the browser and type in the name of this calibration. The real experiment will need to have a different name.
+10. When the experiment config file is filled, switch to the terminal and in a new tab (load bash and navigate to the experiment direcotory), type in =python eVOLVER.py=
+11. Sanity check the experiment settings, press =n= when prompted for blanking the vials, and the experiment should start.
+12. When the experiment is running, a new drop down option should be added corresponding to the experiment name, displaying all the plots.
+
 * Current design
   1. The major caveat in passing message to the Rpi with the current
      design is that the strings are all expected to be _16 values
