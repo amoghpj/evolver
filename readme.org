@@ -28,19 +28,35 @@ Setting up the experiment:
    in the same directory.
 9. If you are running a calibration:
    1. Include the word "-calibration" in the experiment name.
-   2. Open a new terminal window, load bash, navigate to the experiment folder, and start the calibration by typing in =python eVOLVER.py=.  This will display the calibration settings. 
-      When prompted about blanking vials, type n.
-   3. The calibration will stop at the last step. Collect the efflux from each tube.  Select all the vials
-      from the Rpi touch interface on the eVOLVER and run the efflux for
-      10s. Measure the ODs. *Multiply the ODs with a factor of 1.2 if
-      measuring efflux culture.*
-   4. Go back to the web interface, update the =calib_end_od= with the new ODs, write this to file again. NB: The old file will be automatically renamed and time stamped.
-   5. Open a new terminal, load bash, navigate to the experiment directory as in STEP 5.
-   6. Type in  =python write_calibration_to_file.py=. This will create a CSV file with the name of the calibration experiment, the same as the experiment name.
-   7. Next, switch back to the browser and type in the name of this calibration. The real experiment will need to have a different name.
-10. When the experiment config file is filled, switch to the terminal and in a new tab (load bash and navigate to the experiment direcotory), type in =python eVOLVER.py=
-11. Sanity check the experiment settings, press =n= when prompted for blanking the vials, and the experiment should start.
-12. When the experiment is running, a new drop down option should be added corresponding to the experiment name, displaying all the plots.
+   2. Currently, if the per vial parameter =calib_end_od= is left at its default values (0),
+      it is assigned a value =calib_start_od/10=. Please explicitly specify this parameter taking
+      into consideration the sensor readings saturate around 0.075. 
+   3. Open a new terminal window, load bash, navigate to the
+      experiment folder, and start the calibration by typing in
+      =python eVOLVER.py=.  This will display the calibration
+      settings.  When prompted about blanking vials, type n.
+   4. The calibration will stop at the last step. Collect the efflux
+      from each tube.  Select all the vials from the Rpi touch
+      interface on the eVOLVER and run the efflux for 10s. Measure the
+      ODs. *Multiply the ODs with a factor of 1.2 if measuring efflux
+      culture.*
+   5. Go back to the web interface, update the =calib_end_od= with the
+      new ODs, write this to file again. NB: The old file will be
+      automatically renamed and time stamped.
+   6. Open a new terminal, load bash, navigate to the experiment
+      directory as in STEP 5.
+   7. Type in =python write_calibration_to_file.py=. This will create
+      a CSV file with the name of the calibration experiment, the same
+      as the experiment name.
+   8. Next, switch back to the browser and type in the name of this calibration. The real experiment will need to have a different name.
+10. When the experiment config file is filled, switch to the terminal
+    and in a new tab (load bash and navigate to the experiment
+    direcotory), type in =python eVOLVER.py=
+11. Sanity check the experiment settings, press =n= when prompted for
+    blanking the vials, and the experiment should start.
+12. When the experiment is running, a new drop down option should be
+    added corresponding to the experiment name, displaying all the
+    plots.
 
 * Current design
   1. The major caveat in passing message to the Rpi with the current
