@@ -25,6 +25,7 @@ if __name__ == '__main__':
               "patrick":"192.168.1.4",
               "sandy":"192.168.1.5",
               "plankton":"192.168.1.14",
+              "pearl": "192.168.1.11",
               "squidward":"192.168.1.2",
               "krabs":"192.168.1.7"}
     config = {"experiment_settings":
