@@ -62,8 +62,8 @@ if __name__ == '__main__':
             stir_on_rate = st.number_input("Stir on rate", 0)
             stir_switch = st.checkbox("Stir rate switch?", False)
             stir_off_rate = st.number_input("Stir off rate", 0)
-            stir_on_duration = st.number_input("Stir on duration", 6)
-            stir_off_duration = st.number_input("Stir off duration", 6)
+            stir_on_duration = st.number_input("Stir on duration (recommended: 6)", 0)
+            stir_off_duration = st.number_input("Stir off duration (recommended: 6)", 0)
             estimate_gr = st.checkbox("Estimate Growth Rate?", False)
             st.form_submit_button()
         config["experiment_settings"]["ip"] = ipdict[ip]
@@ -111,12 +111,17 @@ if __name__ == '__main__':
 
         editeddf = st.experimental_data_editor(df, use_container_width=True)
         for i, row in editeddf.iterrows():
+            if operation == "calibration":
+                if row.calib_end_od == 0:
+                    calib_end_od = row.calib_initial_od/10
+                else:
+                    calib_end_od = row.calib_end_od
             config["experiment_settings"]["per_vial_settings"].append(
                 {"vial":int(row.Vial),
                  "to_run":row.to_run,
                  "volume":row.volume,
                  "calib_initial_od":row.calib_initial_od,
-                 "calib_end_od":row.calib_end_od,
+                 "calib_end_od":calib_end_od,
                  "turbidostat_low":row.turbidostat_low,
                  "turbidostat_high":row.turbidostat_high,
                  "chemo_start_od":row.chemo_start_od,
