@@ -149,4 +149,7 @@ if __name__ == '__main__':
                         "-OD_autocalib-linear",                         
                         "-growthrate_fromOD"]:
                 st.header(suff[1:])
-                st.image(Image.open(f"{page}{suff}.png"))
+                if os.path.exists(f"{page}{suff}.png"):
+                    st.image(Image.open(f"{page}{suff}.png"))
+                else:
+                    st.text(f"{page}{suff}.png Not found")
