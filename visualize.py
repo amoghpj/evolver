@@ -116,6 +116,8 @@ if __name__ == '__main__':
                     calib_end_od = row.calib_initial_od/10
                 else:
                     calib_end_od = row.calib_end_od
+            else:
+                calib_end_od = row.calib_end_od                
             config["experiment_settings"]["per_vial_settings"].append(
                 {"vial":int(row.Vial),
                  "to_run":row.to_run,
