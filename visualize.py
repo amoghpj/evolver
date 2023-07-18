@@ -27,7 +27,10 @@ if __name__ == '__main__':
               "plankton":"192.168.1.14",
               "pearl": "192.168.1.11",
               "squidward":"192.168.1.2",
-              "krabs":"192.168.1.7"}
+              "mermaidman":"192.168.1.8",
+              "barnacleboy":"192.168.1.9",              
+              "krabs":"192.168.1.7"}        
+
     config = {"experiment_settings":
               {"stir_settings":{
                   "stir_on_rate":4.0,
@@ -45,14 +48,17 @@ if __name__ == '__main__':
         with st.form("global_setup"):
             st.header("Global settings")
             exp_name = st.text_input("Experiment name")
-
             ip = st.selectbox("IP address", ["spongebob",
                                              "gary",
                                              "patrick",
                                              "sandy",
                                              "plankton",
+                                             "pearl",
+                                             "barnacleboy",
+                                             "mermaidman",
                                              "squidward",
                                              "krabs"])
+
             calib = st.text_input("Calibration name")
             operation = st.selectbox("Operation mode", ["calibration",
                                                          "growthcurve",
