@@ -122,9 +122,10 @@ else:
     fig, axes = plt.subplots(4,4, figsize=(16,16))
 
     axes = axes.flatten()
-    if CALIB_NAME != "":
-        for vial, ax in enumerate(axes):
-            if vial in active_vials:
+
+    for vial, ax in enumerate(axes):
+        if vial in active_vials:
+            if CALIB_NAME != "":            
                 rawc90 = pd.read_csv(f"{CALIB_NAME}/od_90_raw/vial{vial}_od_90_raw.txt",
                                    skiprows=[0],
                                    names=["time","90"])
@@ -145,24 +146,24 @@ else:
                 ax.scatter(cdat["90_median"].values, cdat["135_median"].values, label="Calibration Median")
                 ax.scatter(cdat["90"].values,
                            cdat["135"].values, c="r", alpha=0.1,label="Calibration Raw Values")    
-                ddat = df[df.vial == vial]
-                ax.scatter(ddat[ddat["datatype"] == "od_90_raw"].od_90_raw,
-                        ddat[ddat["datatype"] == "od_135_raw"].od_135_raw,
-                           c=ddat[ddat["datatype"] == "od_135_raw"].time.values,
-                           s=3,
-                           alpha=0.5, label="Chemostat Timecourse")
-                ax.set_xlabel("Sensor: 90")
-                ax.set_ylabel("Sensor: 135")
-                #ax.set_xlim(52000, 63500)
+            ddat = df[df.vial == vial]
+            ax.scatter(ddat[ddat["datatype"] == "od_90_raw"].od_90_raw,
+                    ddat[ddat["datatype"] == "od_135_raw"].od_135_raw,
+                       c=ddat[ddat["datatype"] == "od_135_raw"].time.values,
+                       s=3,
+                       alpha=0.5, label="Timecourse")
+            ax.set_xlabel("Sensor: 90")
+            ax.set_ylabel("Sensor: 135")
+            #ax.set_xlim(52000, 63500)
 
-                ax.set_title(f"Vial {vial}")
-            if vial == 15:
-                ax.legend()
+            ax.set_title(f"Vial {vial}")
+        if vial == 15:
+            ax.legend()
 
-        plt.tight_layout()    
-        plt.savefig(f"{EXP_NAME}_projection.png")
+    plt.tight_layout()    
+    plt.savefig(f"{EXP_NAME}_projection.png")
 
-        plt.close()
+    plt.close()
 
     for plotthis in plotthese.keys():
         print(plotthis)
