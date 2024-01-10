@@ -328,6 +328,28 @@ def stir_rate_control(eVOLVER, vials, settings, elapsed_time):
 def growth_curve(eVOLVER, input_data, vials, elapsed_time):
     if settings.stir_switch:
         stir_rate_control(eVOLVER, vials, settings, elapsed_time)
+    values_to_average = 100
+    WINSIZE = 50
+    SAVE_PATH = os.path.dirname(os.path.realpath(__file__))
+    EXP_DIR = os.path.join(SAVE_PATH, settings.exp_name)        
+    for x in vials: #main loop through each vial
+        # Update chemostat configuration files for each vial
+        #initialize OD and find OD path
+        if settings.calib_name is not None:
+            file_name =  "vial{0}_OD_autocalib.txt".format(x)
+            OD_path = os.path.join(EXP_DIR, 'OD_autocalib', file_name)            
+        else:
+            file_name =  "vial{0}_OD.txt".format(x)
+            OD_path = os.path.join(EXP_DIR, 'OD', file_name)
+
+        ## First read in the entire data set...
+        ODdata_full = np.genfromtxt(OD_path, delimiter=',')
+        ## ...then average the last few values
+        ODdata = ODdata_full[-values_to_average:, :]
+        if settings.estimate_gr:
+            ODdata_forgr = ODdata_full[-WINSIZE:, 1]
+            time = ODdata_full[-WINSIZE:,0]            
+            eVOLVER.aj_growth_rate(x, time, ODdata_forgr)                
     return
 
     

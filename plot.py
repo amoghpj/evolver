@@ -10,10 +10,23 @@ from itertools import product
 f = open("experiment_parameters.yaml")
 config = yaml.safe_load(f)
 f.close()
+
+sns.set(style="ticks",
+        font_scale=2,
+        # {'axes.grid' : True},
+              )
+
+plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
+             "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
+             "OD":{"names":["time","OD"], "plot": True, "plotvar":"OD"},
+             "growthrate_fromOD":{"names":["time","gr"], "plot":True, "plotvar":"gr"},
+             "OD_autocalib":{"names":["time","od_plinear_90", "od_plinear_135"],
+                             "plot": True, "plotvar":"od_plinear_135"}}
+
+
 if config["experiment_settings"]["operation"]["mode"] == "calibration":
     EXP_NAME = config["experiment_settings"]["exp_name"]
     num_pump_events = config["experiment_settings"]["operation"]["num_pump_events"]
-
 
     dflist = []
 
@@ -93,21 +106,17 @@ else:
     else:
         CALIB_NAME = ""
     stirswitch = config["experiment_settings"]["stir_settings"]["stir_switch"]
-    active_vials = [pvs["vial"] for pvs in config["experiment_settings"]["per_vial_settings"]]
+    active_vials = [pvs["vial"] for pvs in config["experiment_settings"]["per_vial_settings"]
+                    if pvs["to_run"]]
 
-    plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
-                 "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
-                 "OD":{"names":["time","OD"], "plot": True, "plotvar":"OD"},
-                 "growthrate_fromOD":{"names":["time","gr"], "plot":True, "plotvar":"gr"},
-                 "OD_autocalib":{"names":["time","od_plinear_90", "od_plinear_135"],
-                                 "plot": True, "plotvar":"od_plinear_135"}}
     if stirswitch:
         plotthese["stirrate"] = {"names":["time","old stir time",
                                           "stir rate"],
                                  "plot": False, "plotvar":"stir rate"}
     dflist = []
     cdflist = []
-    for vial, plotthis in product(list(range(16)), plotthese.keys()):
+
+    for vial, plotthis in product(active_vials, plotthese.keys()):
         _df = pd.read_csv(f"{EXP_NAME}/{plotthis}/vial{vial}_{plotthis}.txt",
                           names=plotthese[plotthis]["names"],
                           skiprows=[0]).astype(float)
@@ -119,7 +128,8 @@ else:
 
     df["vial"] = df.vial.astype("category")
 
-    fig, axes = plt.subplots(4,4, figsize=(16,16))
+    fig, axes = plt.subplots(int(np.ceil(len(active_vials)/4.)), 4,
+                             figsize=(20, 5.* np.ceil(len(active_vials)/4.)))
 
     axes = axes.flatten()
 
@@ -177,7 +187,6 @@ else:
                     _df = _df.melt(id_vars=["time","vial","stir rate"], value_vars=["od_plinear_90",
                                                                                     "od_plinear_135"],
                                                       var_name="sensor", value_name="inferred OD").dropna()
-                    sns.set_style("ticks",{'axes.grid' : True})                
                     g = sns.relplot(data=_df[_df.sensor == yvar], x="time",
                                     y="inferred OD",style="stir rate",
                                     col="vial", col_wrap=4,
@@ -205,14 +214,18 @@ else:
 
             elif "growth" in plotthis:
                 if stirswitch:
-                    _df = df[df.datatype == plotthis][["time", yvar, "vial"]].merge(df[df.datatype=="stirrate"][["time","stir rate","vial"]], on=["time","vial"])
+                    _df = df[df.datatype == plotthis]\
+                        [["time", yvar, "vial"]]\
+                        .merge(df[df.datatype=="stirrate"]\
+                               [["time","stir rate","vial"]],
+                               on=["time","vial"])
                     if _df.shape[0] > 0:
-                        _df = _df[(_df[yvar] < 1) & (_df[yvar] > 0 )]
+                        _df = _df[(_df[yvar] < 3) & (_df[yvar] > 0 )]
                         _df["Doubling time (hr)"] = 1/_df[yvar]
                         _df = _df[_df["Doubling time (hr)"] < 50]
                         g = sns.relplot(data=_df, x="time",
                                         y="Doubling time (hr)",
-                                        hue="vial",
+                                        col="vial",col_wrap=4,
                                         style="stir rate", kind="line")            
 
                 else:

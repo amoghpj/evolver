@@ -588,11 +588,11 @@ class EvolverNamespace(BaseNamespace):
         cond = np.logical_and(~(np.isnan(od)), (od > 0))
         idx = cond
         # idx = np.where(cond, od)
-        if idx.size > 50:
-            od = od[idx].values
-            time = time[idx].values
+        if idx.size > 20:
+            _od = od[idx]
+            _time = time[idx]
             model = LinearRegression()
-            model.fit(time.reshape(-1,1), np.log(od))
+            model.fit(_time.reshape(-1,1), np.log(_od))
             slope = model.coef_[0]
             intercept = model.intercept_
             # Save slope to file

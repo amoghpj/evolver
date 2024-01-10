@@ -18,6 +18,7 @@ def write_config_to_file(config):
 if __name__ == '__main__':
     exps = [f for f in os.listdir("./") if (os.path.isdir(f) and f not in  ["__pycache__", "img",".git"])]
     exps.append("Setup")
+    exps.append("Current Experiment")    
     page = st.sidebar.selectbox('Experiments..',exps)
     st.title(f"{page}")
     ipdict = {"spongebob":"192.168.1.3",
@@ -26,7 +27,7 @@ if __name__ == '__main__':
               "sandy":"192.168.1.5",
               "plankton":"192.168.1.14",
               "pearl": "192.168.1.11",
-              "squidward":"192.168.1.2",
+              "squidward":"192.168.1.10",
               "mermaidman":"192.168.1.8",
               "barnacleboy":"192.168.1.9",              
               "krabs":"192.168.1.7"}        
@@ -140,15 +141,16 @@ if __name__ == '__main__':
         write_config = st.button("Write configuration to file")
         if write_config:
             write_config_to_file(config)
-    else:
+    elif page == "Current Experiment":
         if os.path.exists("experiment_parameters.yaml"):
             f = open("experiment_parameters.yaml","r")
             config = yaml.safe_load(f)
             f.close()
-        elif os.path.exists("example_experiment_parameters.yaml"):
-            f = open("experiment_parameters.yaml","r")
-            config = yaml.safe_load(f)
-            f.close()
+            with open('experiment_parameters.yaml') as f:
+                print(f.readline())
+        else:
+            st.text(f"No currently defined experiment available.")
+    else:
         try:
             calib = Image.open(f"{page}.png")
             st.image(calib, )
