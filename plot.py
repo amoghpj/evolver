@@ -19,7 +19,8 @@ sns.set(style="ticks",
 plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
              "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
              "OD":{"names":["time","OD"], "plot": True, "plotvar":"OD"},
-             "growthrate_fromOD":{"names":["time","gr"], "plot":True, "plotvar":"gr"},
+             "growthrate_fromOD":{"names":["time","gr"], "plot":False, "plotvar":"gr"},
+             "growthrate":{"names":["time","gr"], "plot":True, "plotvar":"gr"},             
              "OD_autocalib":{"names":["time","od_plinear_90", "od_plinear_135"],
                              "plot": True, "plotvar":"od_plinear_135"}}
 
@@ -100,6 +101,7 @@ if config["experiment_settings"]["operation"]["mode"] == "calibration":
     except:
         print("no files found")
 else:
+    isok = True
     EXP_NAME = config["experiment_settings"]["exp_name"]
     if "calib_name" in config["experiment_settings"].keys():
         CALIB_NAME = config["experiment_settings"]["calib_name"]
@@ -202,38 +204,49 @@ else:
                                     y="inferred OD",style="stir rate",
                                     col="vial", col_wrap=4,
                                     hue="sensor", kind="line")
-                    plt.yscale("log", base=2)                
+                    plt.yscale("log", base=2)
+                    isok = True                    
                 else:
-                    _df = df[df.datatype == plotthis].melt(id_vars=["time","vial"], value_vars=["od_plinear_90",
-                                                                                  "od_plinear_135"],
-                                                      var_name="sensor", value_name="inferred OD").dropna()
+                    _df = df[df.datatype == plotthis].melt(id_vars=["time","vial"],
+                                                           value_vars=["od_plinear_90",
+                                                                       "od_plinear_135"],
+                                                           var_name="sensor",
+                                                           value_name="inferred OD").dropna()
+                    print(_df)
                     g = sns.relplot(data=_df, x="time",
                                     y="inferred OD",
                                     col="vial", col_wrap=4,
-                                    hue="sensor", kind="line")            
+                                    hue="sensor", kind="line")
+                    isok = True
 
             elif "growth" in plotthis:
-                if stirswitch:
-                    _df = df[df.datatype == plotthis]\
-                        [["time", yvar, "vial"]]\
-                        .merge(df[df.datatype=="stirrate"]\
-                               [["time","stir rate","vial"]],
-                               on=["time","vial"])
-                    if _df.shape[0] > 0:
-                        _df = _df[(_df[yvar] < 3) & (_df[yvar] > 0 )]
-                        _df["Doubling time (hr)"] = 1/_df[yvar]
-                        _df = _df[_df["Doubling time (hr)"] < 50]
-                        g = sns.relplot(data=_df, x="time",
-                                        y="Doubling time (hr)",
-                                        col="vial",col_wrap=4,
-                                        style="stir rate", kind="line")            
+                try:
+                    if stirswitch:
+                        _df = df[df.datatype == plotthis]\
+                            [["time", yvar, "vial"]]\
+                            .merge(df[df.datatype=="stirrate"]\
+                                   [["time","stir rate","vial"]],
+                                   on=["time","vial"])
+                        if _df.shape[0] > 0:
+                            _df = _df[(_df[yvar] < 3) & (_df[yvar] > 0 )]
+                            _df["Doubling time (hr)"] = 1/_df[yvar]
+                            _df = _df[_df["Doubling time (hr)"] < 50]
+                            g = sns.relplot(data=_df, x="time",
+                                            y="Doubling time (hr)",
+                                            col="vial",col_wrap=4,
+                                            style="stir rate", kind="line")            
 
-                else:
-                    g = sns.relplot(data=df[df.datatype == plotthis], x="time",
-                                    y=yvar,
-                                    col="vial", col_wrap=4,
-                                    hue="vial", kind="line")                        
-
+                    else:
+                        _df = df.fillna(0)
+                        g = sns.relplot(data=_df[(_df.datatype == plotthis) & (_df.gr > 0) & (_df.gr < 3)], x="time",
+                                        y=yvar,
+                                        col="vial", col_wrap=4,
+                                        hue="vial")
+                    isok = True
+                except Exception:
+                    print("Error in growth rate plotting")
+                    isok = False
+                    raise
             else:
                 if stirswitch:
                     _df = df[df.datatype == plotthis][["time", yvar, "vial"]].merge(df[df.datatype=="stirrate"][["time","stir rate","vial"]], on=["time","vial"])
@@ -247,6 +260,7 @@ else:
                     g = sns.relplot(data=df[df.datatype == plotthis], x="time",
                                     y=yvar,
                                     col="vial", col_wrap=4,
-                                    hue="vial", kind="line")            
-            plt.savefig(f"{EXP_NAME}-{plotthis}.png")
+                                    hue="vial", kind="line")
+            if isok:
+                plt.savefig(f"{EXP_NAME}-{plotthis}.png")
     

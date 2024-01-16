@@ -197,13 +197,17 @@ class EvolverNamespace(BaseNamespace):
         #odinflection = calib.estimated_od_inflection.unique()[0]
         
         od_plinear_90 = getestod(od90, calib, "90")
-        
-        infl_135 = calib[(calib.vial == x) &\
-                              (calib.sensor ==  135)].reading_inflection.unique()[0]
-        infl_od = calib[(calib.vial == x) &\
-                              (calib.sensor ==  135)].estimated_od_inflection.unique()[0]        
-        print(infl_135)
-        print(od135)
+        try:
+            infl_135 = calib[(calib.vial == x) &\
+                             (calib.sensor ==  135)].reading_inflection.unique()[0]
+            infl_od = calib[(calib.vial == x) &\
+                            (calib.sensor ==  135)].estimated_od_inflection.unique()[0]
+        except:
+            ## TODO Clean this up.
+            ## NOTE: This hack handles calibrations without an inflection point. Very dirty.
+            infl_135 = 10000
+            infl_od = 0.01
+
         if (od135 > infl_135) and od_plinear_90 < infl_od :
             od_plinear_135 = getestod(od135, calib,  "135")
         else:
@@ -593,14 +597,16 @@ class EvolverNamespace(BaseNamespace):
             _time = time[idx]
             model = LinearRegression()
             model.fit(_time.reshape(-1,1), np.log(_od))
-            slope = model.coef_[0]
-            intercept = model.intercept_
-            # Save slope to file
-            file_name =  f"vial{vial}_growthrate_fromOD.txt"
-            gr_path = os.path.join(EXP_DIR, 'growthrate_fromOD', file_name)
-            with open(gr_path, "a+") as outfile:
-                outfile.write(f"{time[-1]},{slope}\n")
-        #return(intercepts, slopes,midpoint)
+            try:
+                slope = model.coef_[0]
+                intercept = model.intercept_
+                # Save slope to file
+                file_name =  f"vial{vial}_growthrate_fromOD.txt"
+                gr_path = os.path.join(EXP_DIR, 'growthrate_fromOD', file_name)
+                with open(gr_path, "a+") as outfile:
+                    outfile.write(f"{time[-1]},{slope}\n")
+            except Exception:
+                print("Error in GR estimation!")
 
     def calc_growth_rate(self, vial, gr_start, elapsed_time):
         ODfile_name =  "vial{0}_OD.txt".format(vial)
@@ -624,7 +630,7 @@ class EvolverNamespace(BaseNamespace):
         logger.debug('growth rate for vial %s: %.2f' % (vial, slope))
 
         # Save slope to file
-        file_name =  "vial{0}_gr.txt".format(vial)
+        file_name =  "vial{0}_growthrate.txt".format(vial)
         gr_path = os.path.join(EXP_DIR, 'growthrate', file_name)
         text_file = open(gr_path, "a+")
         text_file.write("{0},{1}\n".format(elapsed_time, slope))

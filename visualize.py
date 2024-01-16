@@ -56,7 +56,7 @@ if __name__ == '__main__':
             .get("exp_name", "")
         exps = [expname]
     else:
-        currentconfig = None
+        currentconfig = dict()
         exps = []
         expname = ""
 
@@ -66,7 +66,8 @@ if __name__ == '__main__':
     page = st.sidebar.selectbox('Experiments..',exps)
     st.title(f"{page}")
 
-    revipdict = {v:k for k, v in ipdict.items()}
+    revipdict = {str(v):k for k, v in ipdict.items()}
+    print(revipdict)
 
     config = {"experiment_settings":
               {"stir_settings":{
@@ -92,7 +93,7 @@ if __name__ == '__main__':
                               index = EVOLVER_NAMES.index(
                                   revipdict[currentconfig\
                                             .get("experiment_settings", dict())\
-                                            .get("ip", "192.168.1.1")]))
+                                            .get("ip", "192.168.1.3")]))
 
             calib = st.text_input("Calibration name",
                                   value = currentconfig\
@@ -171,7 +172,7 @@ if __name__ == '__main__':
         # if operation == "chemostat":
         #     config["experiment_settings"]["operation"]["chemo_rate"] = chemoset
 
-        if currentconfig is not None:
+        if len(currentconfig) > 0:
             viallist = []
             for pvc in currentconfig.get("experiment_settings", dict())\
                 .get("per_vial_settings", []):
