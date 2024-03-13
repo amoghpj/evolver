@@ -67,7 +67,6 @@ if __name__ == '__main__':
     st.title(f"{page}")
 
     revipdict = {str(v):k for k, v in ipdict.items()}
-    print(revipdict)
 
     config = {"experiment_settings":
               {"stir_settings":{
@@ -242,8 +241,10 @@ if __name__ == '__main__':
                         "-OD",
                         "_projection",                         
                         "-OD_autocalib",
-                        "-OD_autocalib-linear",                         
-                        "-growthrate_fromOD"]:
+                        "-OD_autocalib-linear",
+                        #"-growthrate",
+                        "-growthrate_fromOD"
+                         ]:
                 st.header(suff[1:])
                 if os.path.exists(f"{page}{suff}.png"):
                     st.image(Image.open(f"{page}{suff}.png"))

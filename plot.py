@@ -6,6 +6,17 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 from itertools import product
+from scipy.signal import lfilter, medfilt
+
+def filter_noise(gdf, yvar):
+    print(gdf.columns)
+    n = 200.
+    b = [1./n]*int(n)
+    a= [1]
+    #gdf[yvar] = lfilter(b ,a, gdf[yvar].values)
+    gdf[yvar] = medfilt(gdf[yvar].values, 21)
+    return(gdf[[yvar, "time","vial"]])
+
 
 f = open("experiment_parameters.yaml")
 config = yaml.safe_load(f)
@@ -19,7 +30,7 @@ sns.set(style="ticks",
 plotthese = {"od_90_raw":{"names":["time","od_90_raw"], "plot": True, "plotvar":"od_90_raw"},
              "od_135_raw":{"names":["time","od_135_raw"], "plot": True, "plotvar":"od_135_raw"},
              "OD":{"names":["time","OD"], "plot": True, "plotvar":"OD"},
-             "growthrate_fromOD":{"names":["time","gr"], "plot":False, "plotvar":"gr"},
+             "growthrate_fromOD":{"names":["time","gr"], "plot":True, "plotvar":"gr"},
              "growthrate":{"names":["time","gr"], "plot":True, "plotvar":"gr"},             
              "OD_autocalib":{"names":["time","od_plinear_90", "od_plinear_135"],
                              "plot": True, "plotvar":"od_plinear_135"}}
@@ -135,29 +146,20 @@ else:
 
     axes = axes.flatten()
 
+    if CALIB_NAME !="":
+        calibdf = pd.read_csv(f"{CALIB_NAME}.csv", index_col=0)
+        calibdf = calibdf.assign(sensor = calibdf.sensor.astype(str))
+    else:
+        calibdf = None
     for vial, ax in enumerate(axes):
         if vial in active_vials:
-            if CALIB_NAME != "":            
-                rawc90 = pd.read_csv(f"{CALIB_NAME}/od_90_raw/vial{vial}_od_90_raw.txt",
-                                   skiprows=[0],
-                                   names=["time","90"])
-                rawc135 = pd.read_csv(f"{CALIB_NAME}/od_135_raw/vial{vial}_od_135_raw.txt",
-                                   skiprows=[0],
-                                   names=["time","135"])
-                pump = pd.read_csv(f"{CALIB_NAME}/pump_log/vial{vial}_pump_log.txt",
-                                   skiprows=[0],
-                                   names=["time","pump_duration"])
-                pump["pump_event"] = pump.index.astype(int)
-                cdat = rawc90.merge(rawc135, on="time")
-                cdat["pump_event"] = np.nan
-                for i, prow in pump.iterrows():
-                    cdat.loc[(cdat.time <= prow.time) & (np.isnan(cdat.pump_event)), "pump_event"] = prow.pump_event
-                cdat["90_median"] = cdat.groupby("pump_event")["90"].median()
-                cdat["135_median"] = cdat.groupby("pump_event")["135"].median()    
-
-                ax.scatter(cdat["90_median"].values, cdat["135_median"].values, label="Calibration Median")
-                ax.scatter(cdat["90"].values,
-                           cdat["135"].values, c="r", alpha=0.1,label="Calibration Raw Values")    
+            if CALIB_NAME != "":
+                _calibdf = calibdf[calibdf.vial == vial][["estimated_od","sensor","reading"]]\
+                    .pivot(index="estimated_od",values="reading",columns="sensor")                
+                cdat = _calibdf
+                ax.scatter(cdat["90"].values, cdat["135"].values, label="Calibration Median")
+                # ax.scatter(cdat["90"].values,
+                #            cdat["135"].values, c="r", alpha=0.1,label="Calibration Raw Values")    
             ddat = df[df.vial == vial]
             ax.scatter(ddat[ddat["datatype"] == "od_90_raw"].od_90_raw,
                     ddat[ddat["datatype"] == "od_135_raw"].od_135_raw,
@@ -166,11 +168,47 @@ else:
                        alpha=0.5, label="Timecourse")
             ax.set_xlabel("Sensor: 90")
             ax.set_ylabel("Sensor: 135")
-            #ax.set_xlim(52000, 63500)
 
             ax.set_title(f"Vial {vial}")
-        if vial == 15:
+        if vial == active_vials[-1]:
             ax.legend()
+        
+    # for vial, ax in enumerate(axes):
+    #     if vial in active_vials:
+    #         if CALIB_NAME != "":            
+    #             rawc90 = pd.read_csv(f"{CALIB_NAME}/od_90_raw/vial{vial}_od_90_raw.txt",
+    #                                skiprows=[0],
+    #                                names=["time","90"])
+    #             rawc135 = pd.read_csv(f"{CALIB_NAME}/od_135_raw/vial{vial}_od_135_raw.txt",
+    #                                skiprows=[0],
+    #                                names=["time","135"])
+    #             pump = pd.read_csv(f"{CALIB_NAME}/pump_log/vial{vial}_pump_log.txt",
+    #                                skiprows=[0],
+    #                                names=["time","pump_duration"])
+    #             pump["pump_event"] = pump.index.astype(int)
+    #             cdat = rawc90.merge(rawc135, on="time")
+    #             cdat["pump_event"] = np.nan
+    #             for i, prow in pump.iterrows():
+    #                 cdat.loc[(cdat.time <= prow.time) & (np.isnan(cdat.pump_event)), "pump_event"] = prow.pump_event
+    #             cdat["90_median"] = cdat.groupby("pump_event")["90"].median()
+    #             cdat["135_median"] = cdat.groupby("pump_event")["135"].median()    
+
+    #             ax.scatter(cdat["90_median"].values, cdat["135_median"].values, label="Calibration Median")
+    #             ax.scatter(cdat["90"].values,
+    #                        cdat["135"].values, c="r", alpha=0.1,label="Calibration Raw Values")    
+    #         ddat = df[df.vial == vial]
+    #         ax.scatter(ddat[ddat["datatype"] == "od_90_raw"].od_90_raw,
+    #                 ddat[ddat["datatype"] == "od_135_raw"].od_135_raw,
+    #                    c=ddat[ddat["datatype"] == "od_135_raw"].time.values,
+    #                    s=3,
+    #                    alpha=0.5, label="Timecourse")
+    #         ax.set_xlabel("Sensor: 90")
+    #         ax.set_ylabel("Sensor: 135")
+    #         #ax.set_xlim(52000, 63500)
+
+    #         ax.set_title(f"Vial {vial}")
+    #     if vial == 15:
+    #         ax.legend()
 
     plt.tight_layout()    
     plt.savefig(f"{EXP_NAME}_projection.png")
@@ -212,11 +250,22 @@ else:
                                                                        "od_plinear_135"],
                                                            var_name="sensor",
                                                            value_name="inferred OD").dropna()
-                    print(_df)
+
                     g = sns.relplot(data=_df, x="time",
                                     y="inferred OD",
                                     col="vial", col_wrap=4,
                                     hue="sensor", kind="line")
+                    if config["experiment_settings"]["operation"]["mode"] == "turbidostat":
+                        for i, ax in enumerate(g.axes.flatten()):
+                            ax.axhline(config["experiment_settings"]["per_vial_settings"][i]["turbidostat_high"], color="k")
+                            ax.axhline(config["experiment_settings"]["per_vial_settings"][i]["turbidostat_low"], color="r")                        
+                    plt.savefig(f"{EXP_NAME}-{plotthis}-linear.png")
+                    plt.close()
+                    g = sns.relplot(data=_df, x="time",
+                                    y="inferred OD",
+                                    col="vial", col_wrap=4,
+                                    hue="sensor", kind="line")
+                    plt.yscale("log", base=2)                    
                     isok = True
 
             elif "growth" in plotthis:
@@ -233,20 +282,21 @@ else:
                             _df = _df[_df["Doubling time (hr)"] < 50]
                             g = sns.relplot(data=_df, x="time",
                                             y="Doubling time (hr)",
-                                            col="vial",col_wrap=4,
+                                            col="vial",col_wrap=4,edgecolor=None,
                                             style="stir rate", kind="line")            
 
                     else:
                         _df = df.fillna(0)
+                        sns.set_style("whitegrid")
+                        _df = _df[_df.time > _df.time.max() - 10.0]
                         g = sns.relplot(data=_df[(_df.datatype == plotthis) & (_df.gr > 0) & (_df.gr < 3)], x="time",
-                                        y=yvar,
-                                        col="vial", col_wrap=4,
-                                        hue="vial")
+                                        y=yvar,aspect=0.75,facet_kws={"sharey":False},
+                                        col="vial", col_wrap=4,edgecolor=None)
+                              
                     isok = True
                 except Exception:
                     print("Error in growth rate plotting")
                     isok = False
-                    raise
             else:
                 if stirswitch:
                     _df = df[df.datatype == plotthis][["time", yvar, "vial"]].merge(df[df.datatype=="stirrate"][["time","stir rate","vial"]], on=["time","vial"])
@@ -254,13 +304,22 @@ else:
                         g = sns.relplot(data=_df, x="time",
                                         y=yvar,
                                         col="vial", col_wrap=4,edgecolor=None,
-                                        hue="stir rate", marker="o")            
+                                        hue="stir rate", marker="o",facet_kws={"sharey":False})            
 
                 else:
-                    g = sns.relplot(data=df[df.datatype == plotthis], x="time",
-                                    y=yvar,
+                    TWINDOW = 200
+                    _df = df[(df.datatype == plotthis)\
+                             & (df["time"] > (df["time"].max() - TWINDOW))]
+                    g = _df.groupby(["vial"]).apply(filter_noise, yvar)
+                    _df = _df.merge(g, on=["vial","time"],suffixes=["","_smooth"])
+                    g = sns.relplot(data=_df, x="time",
+                                    y=f"{yvar}_smooth",
                                     col="vial", col_wrap=4,
-                                    hue="vial", kind="line")
+                                    kind="line",facet_kws={"sharey":False})                                                            
+                    # g = sns.relplot(data=df[df.datatype == plotthis], x="time",
+                    #                 y=yvar,
+                    #                 col="vial", col_wrap=4,
+                    #                 hue="vial", kind="line",facet_kws={"sharey":False})
             if isok:
                 plt.savefig(f"{EXP_NAME}-{plotthis}.png")
     
