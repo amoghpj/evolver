@@ -386,6 +386,58 @@ class EvolverNamespace(BaseNamespace):
             logger.info('updating chemostat: %s' % MESSAGE)
             self.emit('command', MESSAGE, namespace = '/dpu-evolver')
 
+    def update_chemo_dual(self, data, vials, bolus_in_s_1,bolus_in_s_2, period_config_1, period_config_2, immediate = False):
+        current_pump = data['config']['pump']['value']
+
+        MESSAGE = {'fields_expected_incoming': 49,
+                   'fields_expected_outgoing': 49,
+                   'recurring': True,
+                   'immediate': immediate,
+                   'value': ['--'] * 48,
+                   'param': 'pump'}
+
+        for x in vials:
+            # stop pumps if period is zero
+            # influx 1 
+            MESSAGE['value'][x] = '0|0'
+            # influx 2
+            MESSAGE['value'][x + 32] = '0|0'
+            # efflux
+            ep = [v for v in [period_config_1[x], period_config_2[x]] if v >0]
+            if len(ep) == 0:
+                MESSAGE['value'][x + 16] = '0|0'
+            else:
+                efflux_period = min(ep)
+                
+            if period_config_1[x] == 0:
+                # influx 1 
+                MESSAGE['value'][x] = '0|0'
+                #MESSAGE['value'][x + 16] = '0|0'
+            else:
+                # influx 1
+                MESSAGE['value'][x] = '%.2f|%d' % (bolus_in_s_1[x], period_config_1[x])
+                # efflux
+                MESSAGE['value'][x + 16] = '%.2f|%d' % (bolus_in_s_1[x]  * 3,  ## As much as possible
+                                                        efflux_period)    ## As often as possible
+                
+                
+            if period_config_2[x] == 0:                 
+                MESSAGE['value'][x + 32] = '0|0'                
+                # efflux
+                #MESSAGE['value'][x + 16] = '0|0'
+            else:
+                # influx 2 
+                MESSAGE['value'][x + 32] = '%.2f|%d' % (bolus_in_s_2[x], period_config_2[x])                
+                # efflux
+                MESSAGE['value'][x + 16] = '%.2f|%d' % (bolus_in_s_2[x]  * 3,  ## As much as possible
+                                                        efflux_period)    ## As often as possible
+                                
+
+        if MESSAGE['value'] != current_pump:
+            # print("".join([str(v) + "\t" if (i+1) % 4 != 0 else str(v) + "\n" for i,v in enumerate(MESSAGE['value'])]))
+            logger.info('updating chemostat: %s' % MESSAGE)
+            self.emit('command', MESSAGE, namespace = '/dpu-evolver')            
+
     def stop_all_pumps(self, ):
         data = {'param': 'pump',
                 'value': ['0'] * 48,
@@ -502,8 +554,9 @@ class EvolverNamespace(BaseNamespace):
                                   directory='growthrate')
                 # make chemostat file
                 self._create_file(x, 'chemo_config',
-                                  defaults=["0,0,0",
-                                            "0,0,0"],
+                                  defaults=["0,0,0,",
+                                            "0,0,0,1",
+                                            "0,0,0,2"],
                                   directory='chemo_config')
 
             stir_rate = STIR_INITIAL
@@ -593,26 +646,25 @@ class EvolverNamespace(BaseNamespace):
         idx = cond
         # idx = np.where(cond, od)
         if idx.size > 20:
-            _od = od[idx]
-            _time = time[idx]
+            _od = od[idx].values
+            _time = time[idx].values
             model = LinearRegression()
             model.fit(_time.reshape(-1,1), np.log(_od))
-            try:
-                slope = model.coef_[0]
-                intercept = model.intercept_
-                # Save slope to file
-                file_name =  f"vial{vial}_growthrate_fromOD.txt"
-                gr_path = os.path.join(EXP_DIR, 'growthrate_fromOD', file_name)
-                with open(gr_path, "a+") as outfile:
-                    outfile.write(f"{time[-1]},{slope}\n")
-            except Exception:
-                print("Error in GR estimation!")
+            slope = model.coef_[0]
+            intercept = model.intercept_
+            # Save slope to file
+            file_name =  f"vial{vial}_growthrate_fromOD.txt"
+            gr_path = os.path.join(EXP_DIR, 'growthrate_fromOD', file_name)
+            with open(gr_path, "a+") as outfile:
+                outfile.write(f"{_time[-1]},{slope}\n")
 
     def calc_growth_rate(self, vial, gr_start, elapsed_time):
-        ODfile_name =  "vial{0}_OD.txt".format(vial)
+        print(vial)
+        ODfile_name =  "vial{0}_OD_autocalib.txt".format(vial)
         # Grab Data and make setpoint
-        OD_path = os.path.join(EXP_DIR, 'OD', ODfile_name)
+        OD_path = os.path.join(EXP_DIR, 'OD_autocalib', ODfile_name)
         OD_data = np.genfromtxt(OD_path, delimiter=',')
+        
         raw_time = OD_data[:, 0]
         raw_OD = OD_data[:, 1]
         raw_time = raw_time[np.isfinite(raw_OD)]
@@ -692,6 +744,8 @@ class EvolverNamespace(BaseNamespace):
             custom_script.turbidostat(self, data, vials, elapsed_time)
         elif mode == 'chemostat':
             custom_script.chemostat(self, data, vials, elapsed_time)
+        elif mode == 'chemostat_dual':
+            custom_script.chemostatdual(self, data, vials, elapsed_time)            
         elif mode == 'growthcurve':
             custom_script.growth_curve(self, data, vials, elapsed_time)
         elif mode == 'calibration':

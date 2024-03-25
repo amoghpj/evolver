@@ -36,7 +36,8 @@ EVOLVER_NAMES = ["spongebob",
                  "barnacleboy",
                  "mermaidman",
                  "squidward",
-                 "krabs"]
+                 "krabs",
+                 "krabs_new","squidward_new"]
 ipdict = {"spongebob":"192.168.1.3",
           "gary":"192.168.1.6",
           "patrick":"192.168.1.4",
@@ -46,7 +47,10 @@ ipdict = {"spongebob":"192.168.1.3",
           "squidward":"192.168.1.10",
           "mermaidman":"192.168.1.8",
           "barnacleboy":"192.168.1.9",              
-          "krabs":"192.168.1.7"}
+          "krabs":"192.168.1.7",
+          "krabs_new":"169.254.6.231",
+          "squidward_new":"169.254.195.106"
+          }
 
 if __name__ == '__main__':
     if os.path.exists("experiment_parameters.yaml"):
@@ -184,7 +188,8 @@ if __name__ == '__main__':
                      "calib_initial_od":0.,"calib_end_od":0.,
                      "turbidostat_low":0.,"turbidostat_high":0.,
                      "chemo_start_od":0.0, "chemo_start_time":0.0,
-                     "chemo_rate":0.0}
+                     "chemo_rate":0.0,
+                     "chemo_rate_2":0.0}
                     for vial in range(16)
                 ]
             )
@@ -209,6 +214,7 @@ if __name__ == '__main__':
                  "chemo_start_od":row.chemo_start_od,
                  "chemo_start_time":row.chemo_start_time,
                  "chemo_rate":row.chemo_rate,
+                 "chemo_rate_2":row.chemo_rate_2,
                  })
         write_config = False
         write_config = st.button("Write configuration to file")
