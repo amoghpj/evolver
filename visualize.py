@@ -194,7 +194,7 @@ if __name__ == '__main__':
                 ]
             )
 
-        editeddf = st.experimental_data_editor(df, use_container_width=True)
+        editeddf = st.data_editor(df, use_container_width=True)
         for i, row in editeddf.iterrows():
             if operation == "calibration":
                 if row.calib_end_od == 0:

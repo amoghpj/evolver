@@ -187,7 +187,14 @@ class Settings():
                     if key not in per_vial_dict[vidx].keys():
                         bye(f"Missing {key} specification for vial {vidx}")
                 self.turbidostat_low[vidx] = per_vial_dict[vidx].get("turbidostat_low")
-                self.turbidostat_high[vidx] = per_vial_dict[vidx].get("turbidostat_high")                                
+                self.turbidostat_high[vidx] = per_vial_dict[vidx].get("turbidostat_high")
+        if self.operation_mode == "morbidostat":
+            """
+            Morbidostat operation
+            """
+            self.vials_to_run = [0]*16            
+            for vidx in self.active_vials:
+                self.vials_to_run[vidx] = 1                                
 
     def fmt(self, l, numtabs=0):
         sep = "".join(["\t"]*numtabs)
@@ -230,7 +237,6 @@ class Settings():
         if self.operation_mode == "chemostat":
             s += "Mode selection: chemostat\n"
             s += f"\tChemostat rate: {self.fmt(self.chemo_rate, 1)}\n"
-            s += f"\tChemostat rate In2: {self.fmt(self.chemo_rate_2, 1)}\n"
             s += f"\tChemostat start od: {self.fmt(self.chemo_start_od,1)}\n"
             s += f"\tChemostat start time: {self.fmt(self.chemo_start_time,1)}\n"
             s += f"\tGrowth rate responsive start?: {self.chemo_growth_rate_responsive_start}\n"
@@ -244,7 +250,11 @@ class Settings():
         if self.operation_mode == "turbidostat":
             s += "Mode selection: turbidostat\n"
             s += f"\tTurbidostat low: {self.fmt(self.turbidostat_low, 1)}\n"
-            s += f"\tTurbidostat high: {self.fmt(self.turbidostat_high, 1)}\n"            
+            s += f"\tTurbidostat high: {self.fmt(self.turbidostat_high, 1)}\n"
+        if self.operation_mode == "turbidostat_custom":
+            s += "Mode selection: turbidostat\n"
+            s += f"\tTurbidostat low: {self.fmt(self.turbidostat_low, 1)}\n"
+            s += f"\tTurbidostat high: {self.fmt(self.turbidostat_high, 1)}\n"                        
         return(s)
         
         
@@ -970,6 +980,102 @@ def chemostatdual(eVOLVER, input_data, vials, elapsed_time):
     
 # def your_function_here(): # good spot to define modular functions for dynamics or feedback
 
+def morbidostat(eVOLVER, input_data, vials, elapsed_time):
+    """
+    CREATED: 2024-03-29
+    COMMENTARY:
+    Direct implementation of logic from Toprak 2011
+    """
+    OD_data = input_data['transformed']['od']
+    flow_rate = eVOLVER.get_flow_rate()       #read from calibration file
+    MESSAGE = ['--'] * 48
+    pumplogs = [os.path.join(eVOLVER.exp_dir, settings.exp_name,
+                                            "pump_log", f"vial{x}_pump_log.txt")
+                for x in vials]
+    ## Dispense 10% of vial volume => 9% of stock stress, and 90.1% OD
+    ## Dispense 5% of vial volume => 4.7% of stock stress, and 95.2% OD    
+    volume = [0.05*vsleeve for vsleeve, vtr\
+              in zip(settings.volume,
+                     settings.vials_to_run)]
+    volume = [0.1*settings.volume[0],
+              0.1*settings.volume[1],
+              0.1*settings.volume[2],
+              0.1*settings.volume[3],
+              0.1*settings.volume[4],
+              0.1*settings.volume[5]]
+    pump_run_duration = [volume[x]/flow_rate[x]
+                         if flow_rate[x] != '' else 0 for x in vials[:6]]
+    setpoint = 0.15
+    time_interval = [0.25, 0.5, 0.75, 1.0, 0.5 ,0.25]
+    GROWTHDELTA = 0.01
+    for x in vials:
+        if settings.vials_to_run[x] == 1:
+            file_name =  "vial{0}_OD_autocalib.txt".format(x)
+            OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD_autocalib', file_name)
+
+            pump_file_name =  "vial{0}_pump_log.txt".format(x)
+            pump_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'pump_log', pump_file_name)
+
+            data =  pd.read_csv(OD_path,sep=",",)
+            pumpdata =  pd.read_csv(pump_path,
+                                    sep=",",
+                                    names=["time","timein","pump"],
+                                    skiprows=[0])
+            sensor = "135"
+            data["OD"] = data[f"od_plinear_{sensor}"]
+            lastpumptime = time_interval[x]
+            if pumpdata.shape[0] > 1:
+                lastpumptime = pumpdata.tail(1).time.values[0]
+
+            taildf = data[data.time > (elapsed_time - lastpumptime)]
+            lastODvals = taildf.OD.tail(3).median()
+            firstODvals = taildf.OD.head(3).median()
+            if not np.isnan(lastODvals):
+                if (elapsed_time - lastpumptime) > time_interval[x]:
+                    deltaOD = lastODvals - firstODvals
+                    file_name =  f"vial{x}_od_{sensor}_raw.txt"
+                    ODpath = os.path.join(eVOLVER.exp_dir, settings.exp_name, f'od_{sensor}_raw', file_name)        
+                    sensordata = pd.read_csv(ODpath,
+                                             sep=",",names=["elapsed_time","od"],
+                                             skiprows=[0])         
+
+                    if ((lastODvals > setpoint) and (deltaOD > GROWTHDELTA)) or (np.isnan(lastODvals)):
+                        MESSAGE[x + 32] = str(round(pump_run_duration[x], 2))
+                        MESSAGE[x + 16] = str(round(pump_run_duration[x]+4, 2))
+                        timein = round(pump_run_duration[x],2)            
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in2\n")                        
+                            # elif (deltaOD > GROWTHDELTA):
+                    else:
+                        MESSAGE[x] = str(round(pump_run_duration[x], 2))
+                        MESSAGE[x + 16] = str(round(pump_run_duration[x]+4, 2))
+                        timein = round(pump_run_duration[x],2)                        
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in1\n")
+            else:
+                """
+                Keep diluting
+                """
+                file_name =  "vial{0}_od_135_raw.txt".format(x)
+                OD135_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'od_135_raw', file_name)        
+                sensordata = pd.read_csv(OD135_path,
+                                         sep=",",names=["elapsed_time","od"],
+                                        skiprows=[0])         
+                calibration = pd.read_csv(os.path.join(eVOLVER.exp_dir,\
+                                                       f"{settings.calib_name}.csv"))
+                beyond_upper_setpoint = (float(np.median(sensordata.od.tail(10))) < calibration[(calibration.vial == x) & (calibration.sensor == 135)].reading.min())
+                if beyond_upper_setpoint:
+                    MESSAGE[x + 32] = str(round(pump_run_duration[x], 2))
+                    MESSAGE[x + 16] = str(round(pump_run_duration[x], 2))
+                    timein = round(pump_run_duration[x],2)                        
+                    with open(pumplogs[x], "a+") as outfile:
+                        outfile.write(f"{elapsed_time},{timein},in2\n")
+            # else:
+            #     MESSAGE[x] = '--'
+            #     MESSAGE[x + 16] = '--'
+            #     MESSAGE[x + 32] = '--'                        
+    if MESSAGE != ['--'] * 48:
+        eVOLVER.fluid_command(MESSAGE)
 
 if __name__ == '__main__':
     print('Please run eVOLVER.py instead')

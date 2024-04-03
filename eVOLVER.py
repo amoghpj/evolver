@@ -751,7 +751,9 @@ class EvolverNamespace(BaseNamespace):
         elif mode == 'calibration':
             custom_script.calibration(self, data, vials, elapsed_time)            
         elif mode == 'growth_curve_stop_stir':
-            custom_script.growth_curve_stop_stir(self, data, vials, elapsed_time)            
+            custom_script.growth_curve_stop_stir(self, data, vials, elapsed_time)
+        elif mode == 'morbidostat':
+            custom_script.morbidostat(self, data, vials, elapsed_time)                                    
         else:
             # try to load the user function
             # if failing report to user
