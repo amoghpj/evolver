@@ -172,7 +172,7 @@ class EvolverNamespace(BaseNamespace):
             # raise
             return(['NaN', 'NaN'])
 
-        calib = calib.sort_values(by=["vial","time"]).reset_index(drop=True)
+        calib = calib[calib.is_monotonic < 0].sort_values(by=["vial","time"]).reset_index(drop=True)
         piecewiselinear = lambda x1, x2, y1, y2, x: ((y2 - y1)/(x2 - x1)) * (x - x1) + y1
         
         def getestod(v, calib, sensor):
@@ -208,10 +208,11 @@ class EvolverNamespace(BaseNamespace):
             infl_135 = 10000
             infl_od = 0.01
 
-        if (od135 > infl_135) and od_plinear_90 < infl_od :
-            od_plinear_135 = getestod(od135, calib,  "135")
-        else:
-            od_plinear_135 = "NaN"            
+        # if (od135 > infl_135) and od_plinear_90 < infl_od :
+            
+        # else:
+        #     od_plinear_135 = "NaN"
+        od_plinear_135 = getestod(od135, calib,  "135")            
 
         # if od_plinear_90 < odinflection:
         #     od_plinear_135 = getestod(od135, calib,  "135")

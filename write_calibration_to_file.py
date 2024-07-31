@@ -59,9 +59,9 @@ num_pump_events= CALIBRATION_NUM_PUMP_EVENTS
 # else:
     # finalod = [CALIBRATION_END_OD]
 finalod  = CALIBRATION_END_OD    
-print(VOLUME)
-print(CALIBRATION_INITIAL_OD)
-print(finalod)
+# print(VOLUME)
+# print(CALIBRATION_INITIAL_OD)
+# print(finalod)
 dflist = []
 for sensor, vial in product(["90","135"], range(16)):
     if VIALS_TO_RUN[vial] == 1:
@@ -78,15 +78,11 @@ for sensor, vial in product(["90","135"], range(16)):
         df["pump"] = np.nan
         df["dilevent"] = 0
         bolus = VOLUME[vial]*((CALIBRATION_INITIAL_OD[vial]/finalod[vial])**(1/num_pump_events) - 1)
-        print(bolus)
         prevtime = 0
         pumpdf = pumpdf.reset_index(drop=True)
-        print(pumpdf)
         pumpeventidx = pumpdf.index.values
-        print(pumpeventidx)
         for dil, (i, row) in enumerate(pumpdf.iterrows()):
             df.loc[df.time == row.time, "pump"] = row.pump
-            print(dil, row)
             if len(pumpeventidx) < dil + 2:
                 df.loc[df.time > row.time, "dilevent"] = dil
                 df.loc[df.time > row.time, "estimated_od"] = CALIBRATION_INITIAL_OD[vial]*(VOLUME[vial]/(VOLUME[vial] + bolus))**(dil)
@@ -120,6 +116,7 @@ calibdf = calibdf.merge(calibdf.loc[(calibdf.sensor == "135")\
 calibdf["estimated_od_inflection"] = calibdf["estimated_od_inflection"] - INFLECTION_CORRECTION
 calibdf["prevod"] = calibdf.groupby(["vial","sensor"]).estimated_od.shift(1)
 calibdf["prevreading"] = calibdf.groupby(["vial","sensor"]).reading.shift(1)
+calibdf = calibdf.assign(is_monotonic = calibdf.reading - calibdf.prevreading)
 calibdf = calibdf[calibdf.prevod > 0]
 calibdf = calibdf.dropna()
 calibdf.to_csv(f"{EXP_NAME}.csv")

@@ -25,7 +25,8 @@ def load_config(path):
 OPERATION_MODES = ["calibration",
                   "growthcurve",
                   "chemostat",
-                  "turbidostat"]
+                   "turbidostat",
+                   "morbidostat"]
 
 EVOLVER_NAMES = ["spongebob",
                  "gary",
@@ -33,6 +34,7 @@ EVOLVER_NAMES = ["spongebob",
                  "sandy",
                  "plankton",
                  "pearl",
+                 "pearl_new",
                  "barnacleboy",
                  "mermaidman",
                  "squidward",
@@ -49,6 +51,7 @@ ipdict = {"spongebob":"192.168.1.3",
           "barnacleboy":"192.168.1.9",              
           "krabs":"192.168.1.7",
           "krabs_new":"169.254.6.231",
+          "pearl_new":"169.254.219.11",          
           "squidward_new":"169.254.195.106"
           }
 
@@ -182,40 +185,38 @@ if __name__ == '__main__':
                 viallist.append(pvc)
             df = pd.DataFrame(viallist)
         else:
-            df = pd.DataFrame(
-                [
-                    {"vial": f"{vial}", "to_run": True, "volume":20., 
-                     "calib_initial_od":0.,"calib_end_od":0.,
-                     "turbidostat_low":0.,"turbidostat_high":0.,
-                     "chemo_start_od":0.0, "chemo_start_time":0.0,
-                     "chemo_rate":0.0,
-                     "chemo_rate_2":0.0}
-                    for vial in range(16)
-                ]
-            )
+            df = pd.DataFrame([
+                {"vial": vial, "to_run": True, "volume":20., 
+                 "calib_initial_od":0.,"calib_end_od":0.,
+                 "turbidostat_low":0.,"turbidostat_high":0.,
+                 "chemo_start_od":0.0, "chemo_start_time":0.0,
+                 "chemo_rate":0.0,
+                 "morbidostat_setpoint":0,"doubling_time":0,"description":"",
+                 "chemo_rate_2":0.0}
+                for vial in range(16)])
+
+            if operation == "calibration":
+                df = df[["vial","to_run","volume","calib_initial_od", "calib_end_od","description"]]
+            elif operation == "growthcurve":
+                df = df[["vial","to_run","volume","calib_initial_od", "calib_end_od","description"]]                
+            elif operation == "morbidostat":
+                df = df[["vial","to_run","volume","morbidostat_setpoint","doubling_time","calib_initial_od","calib_end_od","description"]]
+            elif operation == "turbidostat":
+                df = df[["vial","to_run","volume","turbidostat_low","turbidostat_high","calib_initial_od","calib_end_od","description"]]
+            elif operation == "chemostat":
+                df = df[["vial","to_run","volume","chemo_rate","chemo_start_od","chemo_start_time","description"]]                
+                
 
         editeddf = st.data_editor(df, use_container_width=True)
         for i, row in editeddf.iterrows():
             if operation == "calibration":
                 if row.calib_end_od == 0:
                     calib_end_od = row.calib_initial_od/10
+                elif row.calib_end_od > row.calib_initial_od:
+                    st.warning("Invalid calibration bounds!")
                 else:
                     calib_end_od = row.calib_end_od
-            else:
-                calib_end_od = row.calib_end_od                
-            config["experiment_settings"]["per_vial_settings"].append(
-                {"vial":int(row.vial),
-                 "to_run":row.to_run,
-                 "volume":row.volume,
-                 "calib_initial_od":row.calib_initial_od,
-                 "calib_end_od":calib_end_od,
-                 "turbidostat_low":row.turbidostat_low,
-                 "turbidostat_high":row.turbidostat_high,
-                 "chemo_start_od":row.chemo_start_od,
-                 "chemo_start_time":row.chemo_start_time,
-                 "chemo_rate":row.chemo_rate,
-                 "chemo_rate_2":row.chemo_rate_2,
-                 })
+            config["experiment_settings"]["per_vial_settings"].append(row.to_dict())
         write_config = False
         write_config = st.button("Write configuration to file")
         if write_config:
@@ -243,14 +244,14 @@ if __name__ == '__main__':
             st.image(curves)
         except:
             for suff in ["-od_135_raw",
-                        "-od_90_raw",
-                        "-OD",
-                        "_projection",                         
-                        "-OD_autocalib",
-                        "-OD_autocalib-linear",
-                        #"-growthrate",
-                        "-growthrate_fromOD"
-                         ]:
+                         "-od_90_raw",
+                         "-OD",
+                         "_projection",                         
+                         "-OD_autocalib",
+                         "-OD_autocalib-linear",
+                         "-growthrate_fromOD",
+                         "-OD_autocalib",
+                         "-temp","-morbidostat"]:
                 st.header(suff[1:])
                 if os.path.exists(f"{page}{suff}.png"):
                     st.image(Image.open(f"{page}{suff}.png"))

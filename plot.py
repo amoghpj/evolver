@@ -88,11 +88,18 @@ if config["experiment_settings"]["operation"]["mode"] == "calibration":
                         facet_kws={"sharey":False})
 
         axes = g.fig.axes
-        for ax, vial in zip(axes, list(range(16))):
-            for i, (idx, row) in enumerate(fulldf[(fulldf.sensor == "90") & (fulldf.vial == vial) & (fulldf.pump > 0)].iterrows()):
+        vials = [v for v in config["experiment_settings"]["per_vial_settings"] if v["to_run"]]
+        
+        for ax, vial in zip(axes, range(len(vials))):
+            for i, (idx, row) in enumerate(fulldf[(fulldf.sensor == "90") &\
+                                                  (fulldf.vial == vials[vial]["vial"]) &\
+                                                  (fulldf.pump > 0)].iterrows()):
                 ax.axvline(row.time, color="k", alpha=0.4)
-                ax.text(row.time, fulldf[(fulldf.sensor == "90") & (fulldf.vial == vial) & (fulldf.time < row.time)].reading.median(), str(i))    
-
+                ax.text(row.time,
+                        fulldf[(fulldf.sensor == "90") &\
+                               (fulldf.vial == vials[vial]["vial"]) &\
+                               (fulldf.time < row.time)].reading.median(),
+                        str(i))    
         # for sensor,axrow in zip(["90","135"],[axes, axes]):
         #     for ax, vial in zip(axrow, list(range(16))):
         #         for i, (idx, row) in enumerate(fulldf[(fulldf.sensor == sensor) & (fulldf.vial == vial) & (fulldf.pump > 0)].iterrows()):
