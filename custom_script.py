@@ -509,7 +509,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
     #### We shouldn't have to wait too long for the dilution, as it will mess up the experiment.
     #### Add at most 3mLs for each dilution event.
-    num_pump_events = 6 # settings.calibration_num_pump_events
+    num_pump_events = 10 # settings.calibration_num_pump_events
 
     pumplogs = [os.path.join(eVOLVER.exp_dir, settings.exp_name,
                                             "pump_log", f"vial{x}_pump_log.txt")
@@ -565,8 +565,14 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
             #     sensor_to_use = "od_plinear_135"
             #     data["OD"] = data.od_plinear_135
 
-            sensor_to_use = "od_plinear_90" #"od_plinear_135"
-            data["OD"] = data.od_plinear_90
+            # if x == 0:
+            #     sensor_to_use = "od_plinear_90"
+            #     raw_path = "od_90_raw"
+            #     sensor = 90
+            sensor_to_use = "od_plinear_135"
+            raw_path = "od_135_raw"
+            sensor = 135
+            data["OD"] = data[sensor_to_use]
         else:
             file_name =  "vial{0}_OD.txt".format(x)
             OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD', file_name)            
@@ -593,13 +599,13 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
             pass
             
         ## Custom
-        file_name =  "vial{0}_od_90_raw.txt".format(x)
-        OD90_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'od_90_raw', file_name)        
+        
+        raw_file_name =  "vial{0}_{1}.txt".format(x,raw_path)
+        OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, raw_path, raw_file_name)        
 
-        sensordata = pd.read_csv(OD90_path,
+        sensordata = pd.read_csv(OD_path,
                                  sep=",",names=["elapsed_time","od"],
-                                skiprows
-                             =[0]) 
+                                skiprows=[0]) 
         average_OD = 0
         # Determine whether turbidostat dilutions are needed
         collecting_more_curves = (num_curves <= (stop_after_n_curves + 2)) #logical, checks to see if enough growth curves have happened
@@ -615,7 +621,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
 
             ### If we have exceeded the calibration range, compare the raw values directly.
             beyond_upper_setpoint = ((average_OD > upper_thresh[x]) and (ODset != lower_thresh[x]))\
-                or (float(np.median(sensordata.od.tail(10))) < calibration[(calibration.vial == x) & (calibration.sensor == 90)].reading.min())
+                or (float(np.median(sensordata.od.tail(10))) < calibration[(calibration.vial == x) & (calibration.sensor == sensor)].reading.min())
                 
             if beyond_upper_setpoint:
                 text_file = open(ODset_path, "a+")
@@ -624,7 +630,7 @@ def turbidostat(eVOLVER, input_data, vials, elapsed_time):
                 text_file.close()
                 ODset = lower_thresh[x]
             below_lower_setpoint = ((np.median(data.OD.tail(5)) <= lower_thresh[x] ) and (ODset != upper_thresh[x]))\
-                or ((float(np.median(sensordata.od.tail(5))) > calibration[(calibration.vial == x) & (calibration.sensor == 90)].reading.max()))
+                or ((float(np.median(sensordata.od.tail(5))) > calibration[(calibration.vial == x) & (calibration.sensor == sensor)].reading.max()))
             
             if below_lower_setpoint:                
                 text_file = open(ODset_path, "a+")
