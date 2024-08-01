@@ -221,7 +221,12 @@ class EvolverNamespace(BaseNamespace):
     def transform_data(self, data, vials, od_cal, temp_cal):
         od_data_2 = None
         if od_cal['type'] == THREE_DIMENSION:
-            od_data_2 = data['data'].get(od_cal['params'][1], None)
+            if od_cal['params'][0] == "od_90":
+                od90_data = data['data'].get(od_cal['params'][0], None)
+                od_data_2 = data['data'].get(od_cal['params'][1], None)
+            else:
+                od90_data = data['data'].get(od_cal['params'][1], None)
+                od_data_2 = data['data'].get(od_cal['params'][0], None)            
 
         od_data = data['data'].get(od_cal['params'][0], None)
         temp_data = data['data'].get(temp_cal['params'][0], None)
