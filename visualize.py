@@ -7,6 +7,7 @@ import pandas as pd
 import shutil
 import time
 from subprocess import Popen, run
+import numpy as np
 
 def write_config_to_file(config):
     cyaml = yaml.safe_dump(config)
@@ -34,25 +35,20 @@ EVOLVER_NAMES = ["spongebob",
                  "sandy",
                  "plankton",
                  "pearl",
-                 "pearl_new",
                  "barnacleboy",
                  "mermaidman",
                  "squidward",
-                 "krabs",
-                 "krabs_new","squidward_new"]
+                 "krabs"]
 ipdict = {"spongebob":"192.168.1.3",
           "gary":"192.168.1.6",
           "patrick":"192.168.1.4",
           "sandy":"192.168.1.5",
           "plankton":"192.168.1.14",
-          "pearl": "192.168.1.11",
-          "squidward":"192.168.1.10",
-          "mermaidman":"192.168.1.8",
+          "mermaidman":"169.254.51.129",
           "barnacleboy":"192.168.1.9",              
-          "krabs":"192.168.1.7",
-          "krabs_new":"169.254.6.231",
-          "pearl_new":"169.254.219.11",          
-          "squidward_new":"169.254.195.106"
+          "krabs":"169.254.6.231",
+          "pearl":"169.254.219.11",          
+          "squidward":"169.254.195.106"
           }
 
 if __name__ == '__main__':
@@ -184,6 +180,10 @@ if __name__ == '__main__':
                 .get("per_vial_settings", []):
                 viallist.append(pvc)
             df = pd.DataFrame(viallist)
+            allcolumns = ["morbidostat_setpoint", "doubling_time","turbidostat_low","turbidostat_high","chemo_start_od","chemo_start_time","chemo_rate_2"]
+            for col in allcolumns:
+                if col not in df.columns:
+                    df[col] = np.nan
         else:
             df = pd.DataFrame([
                 {"vial": vial, "to_run": True, "volume":20., 
@@ -195,16 +195,16 @@ if __name__ == '__main__':
                  "chemo_rate_2":0.0}
                 for vial in range(16)])
 
-            if operation == "calibration":
-                df = df[["vial","to_run","volume","calib_initial_od", "calib_end_od","description"]]
-            elif operation == "growthcurve":
-                df = df[["vial","to_run","volume","calib_initial_od", "calib_end_od","description"]]                
-            elif operation == "morbidostat":
-                df = df[["vial","to_run","volume","morbidostat_setpoint","doubling_time","calib_initial_od","calib_end_od","description"]]
-            elif operation == "turbidostat":
-                df = df[["vial","to_run","volume","turbidostat_low","turbidostat_high","calib_initial_od","calib_end_od","description"]]
-            elif operation == "chemostat":
-                df = df[["vial","to_run","volume","chemo_rate","chemo_start_od","chemo_start_time","description"]]                
+        if operation == "calibration":
+            df = df[["vial","to_run","volume","calib_initial_od", "calib_end_od","description"]]
+        elif operation == "growthcurve":
+            df = df[["vial","to_run","volume","calib_initial_od", "calib_end_od","description"]]                
+        elif operation == "morbidostat":
+            df = df[["vial","to_run","volume","morbidostat_setpoint","doubling_time","calib_initial_od","calib_end_od","description"]]
+        elif operation == "turbidostat":
+            df = df[["vial","to_run","volume","turbidostat_low","turbidostat_high","calib_initial_od","calib_end_od","description"]]
+        elif operation == "chemostat":
+            df = df[["vial","to_run","volume","chemo_rate","chemo_start_od","chemo_start_time","description"]]                
                 
 
         editeddf = st.data_editor(df, use_container_width=True)
@@ -251,7 +251,7 @@ if __name__ == '__main__':
                          "-OD_autocalib-linear",
                          "-growthrate_fromOD",
                          "-OD_autocalib",
-                         "-temp","-morbidostat"]:
+                         "-temp","-morbidostat","-salt"]:
                 st.header(suff[1:])
                 if os.path.exists(f"{page}{suff}.png"):
                     st.image(Image.open(f"{page}{suff}.png"))

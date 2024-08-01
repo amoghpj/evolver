@@ -1,6 +1,7 @@
 import yaml
 import matplotlib.pyplot as plt
 import matplotlib
+from matplotlib.patches import Rectangle
 matplotlib.use("Agg")
 import pandas as pd
 import seaborn as sns
@@ -9,7 +10,6 @@ from itertools import product
 from scipy.signal import lfilter, medfilt
 
 def filter_noise(gdf, yvar):
-    print(gdf.columns)
     n = 200.
     b = [1./n]*int(n)
     a= [1]
@@ -17,11 +17,48 @@ def filter_noise(gdf, yvar):
     gdf[yvar] = medfilt(gdf[yvar].values, 21)
     return(gdf[[yvar, "time","vial"]])
 
+def process_for_autocalib(_df,stirswitch):
+    if stirswitch:
+        return(_df.melt(id_vars=["time","vial","stir rate"],
+                    value_vars=["od_plinear_90",
+                                "od_plinear_135"],
+                    var_name="sensor",
+                    value_name="inferred OD").dropna())
+    else:
+        return(_df.melt(id_vars=["time","vial"],
+                   value_vars=["od_plinear_90",
+                               "od_plinear_135"],
+                   var_name="sensor",
+                   value_name="inferred OD").dropna())
+
+def process_for_morbidostat(_df, pump):
+    if stirswitch:
+        return(_df.melt(id_vars=["time","vial","stir rate"],
+                    value_vars=["od_plinear_90",
+                                "od_plinear_135"],
+                    var_name="sensor",
+                    value_name="inferred OD").dropna())
+    else:
+        return(_df.melt(id_vars=["time","vial"],
+                   value_vars=["od_plinear_90",
+                               "od_plinear_135"],
+                   var_name="sensor",
+                   value_name="inferred OD").dropna())    
+    
+def plot_turbidostat_limits(g, _df):
+    for (i, ax), vialid in enumerate(g.axes.flatten(), _df["vial"].unique()):
+        ax.axhline(config["experiment_settings"]["per_vial_settings"][vialid]["turbidostat_high"], color="k")
+        ax.axhline(config["experiment_settings"]["per_vial_settings"][vialid]["turbidostat_low"], color="r")
+
+
+
 
 f = open("experiment_parameters.yaml")
 config = yaml.safe_load(f)
 f.close()
 
+print(f"PLOTTING: {config['experiment_settings']['exp_name']}")
+TWINDOW = 150
 sns.set(style="ticks",
         font_scale=2,
         # {'axes.grid' : True},
@@ -125,6 +162,152 @@ else:
         CALIB_NAME = config["experiment_settings"]["calib_name"]
     else:
         CALIB_NAME = ""
+    if config["experiment_settings"]["operation"]["mode"] == "turbidostat":
+        plotthis = "ODset"
+        dflist = []
+        active_vials = [pvs for pvs in config["experiment_settings"]["per_vial_settings"]
+                        if pvs["to_run"]]
+
+        for vialconfig in active_vials:
+            vial = vialconfig["vial"]
+            tlow, thigh = vialconfig["turbidostat_low"], vialconfig["turbidostat_high"]
+            _df = pd.read_csv(f"{EXP_NAME}/{plotthis}/vial{vial}_{plotthis}.txt",
+                              names=["Time (hr)","ODset"],
+                              skiprows=[0]).astype(float)
+            _df = _df.assign(vial = vial,
+                             datatype = plotthis,
+                             turbidostat_low = tlow,
+                             turbidostat_high = thigh)
+            dflist.append(_df)
+        df = pd.concat(dflist)
+        df = df[df.turbidostat_low == df.ODset].reset_index(drop=True)
+        straindf = pd.DataFrame({"vial":list(range(0,16)),
+                                 "strain":[6,6,6,6,
+                                           9,9,9,"b",
+                                           "9-ctrl",6,6,9,
+                                           9,"6-ctrl",9,"b"],
+                                 "replicate":[1,2,3,4,
+                                              1,2,3,1,
+                                              1,1,2,1,
+                                              2,1,4,2],
+                                 "outgrowth":[0,0,0,0,
+                                              0,0,0,0,
+                                              0,1,1,1,
+                                              1,0,0,0]})
+        straindf["pregrowth"] = [f"{v}%" for v in straindf.outgrowth]
+        df = df.merge(straindf, on="vial")
+        df = df.assign(last_dilution = df.groupby("vial")["Time (hr)"].shift(1).reset_index()["Time (hr)"],
+                       dilution_count = df.groupby("vial").cumcount())
+        df = df.assign(num_generations = df.dilution_count*np.log2(df.turbidostat_high/df.turbidostat_low) + 1)
+        df = df.assign(dilution_interval_h = df["Time (hr)"] - df.last_dilution)
+        
+        g = sns.relplot(data=df[df.dilution_interval_h < 7],
+                    x="Time (hr)",y="dilution_interval_h",
+                        hue="replicate",kind="line",marker="o",col="strain",
+                        row="pregrowth",
+                        palette="tab10",facet_kws={"sharey":False})
+
+        plt.savefig(f"{EXP_NAME}-dilution-times.png")
+        plt.close()
+        #df.to_csv("temp.csv")
+
+        g = sns.relplot(data=df,
+                        x="Time (hr)",y="num_generations",col="strain",
+                        row="outgrowth",
+                        hue="replicate",kind="line",marker="o",
+                        palette="tab10",facet_kws={"sharey":False}
+                    )
+        # annotate_media(g,ymax=df.num_generations.max())
+        plt.savefig(f"{EXP_NAME}-generation-times.png")
+        plt.close()
+        
+    if config["experiment_settings"]["operation"]["mode"] == "morbidostat":
+        plotthis = "OD_autocalib"        
+        active_vials = [pvs for pvs in config["experiment_settings"]["per_vial_settings"]
+                        if pvs["to_run"]]
+        dflist = []
+        pumplist = []
+        for vialconfig in active_vials:
+            vial = vialconfig["vial"]
+            _df = pd.read_csv(f"{EXP_NAME}/{plotthis}/vial{vial}_{plotthis}.txt",
+                              names=["Time (hr)","od_plinear_90","od_plinear_135"],
+                              skiprows=[0]).astype(float)
+            pump = pd.read_csv(f"{EXP_NAME}/pump_log/vial{vial}_pump_log.txt",
+                              names=["Time (hr)","timein","pump"],
+                              skiprows=[0])
+            _df = _df.assign(vial = vial,
+                             datatype = plotthis)
+            # _df = _df.merge(pump, on="Time (hr)",
+            #                 how="left")
+            _pump = pump.assign(vial = vial)
+            dflist.append(_df)
+            pumplist.append(_pump)
+        df = pd.concat(dflist).reset_index(drop=True)
+        pump = pd.concat(pumplist).reset_index(drop=True)
+        df = df[df["Time (hr)"] > (df["Time (hr)"].max()-TWINDOW)]
+        df["od_plinear_135"] = df.groupby(["vial"]).od_plinear_135.ffill()
+
+
+        def get_salt_conc(gdf):
+            gdf = gdf.assign(Salt_percent_wt = 0)                
+            currsalt = 0
+            STOCK = 1            
+            for i,row in gdf.iterrows():
+                if row.pump == "in2":
+                    currsalt = (currsalt *22  + STOCK*1.1) / (22. + 1.1)
+                    gdf.loc[i, "Salt_percent_wt"] = currsalt
+                elif row.pump == "in1":
+                    currsalt = (currsalt *22 ) / (22. + 1.1)
+                    gdf.loc[i, "Salt_percent_wt"] = currsalt
+                else:
+                    gdf.loc[i, "Salt_percent_wt"] = currsalt
+            return(gdf[["Salt_percent_wt","Time (hr)"]])
+        concentrationdf = pump.merge(pump.groupby("vial").apply(get_salt_conc),
+                                     on=["vial","Time (hr)"])
+        concentrationdf = concentrationdf.assign(Log2_Salt_wtpc = np.log2(concentrationdf.Salt_percent_wt))
+        
+        # 0.14,
+        calibdf = pd.read_csv(f"{config['experiment_settings']['calib_name']}.csv")
+
+        g = sns.relplot(data=df, x="Time (hr)",
+                        y="od_plinear_135",
+                        s=50,edgecolor=None,alpha=0.05,
+                        col="vial",col_wrap=4, palette="deep",
+                        aspect=1.5,
+                        facet_kws={"sharey":False })
+        
+        for ax, v in zip(g.axes.flatten(), df.vial.unique()):
+            for p,c in zip(["in1", "in2"],["g","r"]):
+                T = pump[(pump.vial == v) & (pump.pump == p)]["Time (hr)"]
+                _df = df[(df.vial == v) & (df["Time (hr)"].isin(T))][["Time (hr)","od_plinear_135"]]
+                ax.plot(_df["Time (hr)"],
+                        _df.od_plinear_135,
+                        f"{c}o", ms=5)
+            ax.axhline(config["experiment_settings"]["per_vial_settings"][v]["morbidostat_setpoint"],
+                       color="r",
+                       alpha=0.5)
+            ax2 = ax.twinx()
+            saltdf = concentrationdf[concentrationdf.vial == v]
+            ax2.plot(saltdf["Time (hr)"],
+                     saltdf.Salt_percent_wt, 'r--')
+            ax2.set_ylabel("NaCl (%wt/vol)")
+            ax.add_artist(Rectangle((0,calibdf[calibdf.vial == v].estimated_od.min()), df["Time (hr)"].max(),calibdf[calibdf.vial == v].estimated_od.max() - calibdf[calibdf.vial == v].estimated_od.min(), alpha=0.1))
+        plt.tight_layout()
+        plt.savefig(f"{EXP_NAME}-morbidostat.png")
+        plt.close()
+        ### hardcoded
+        volume = 1.1 # ml
+
+
+        g = sns.relplot(data=concentrationdf,
+                        x="Time (hr)", 
+                        y = "Salt_percent_wt",
+                        hue="pump",
+                        col="vial", col_wrap=4, s=100)
+
+        plt.savefig(f"{EXP_NAME}-salt.png")
+        plt.close()
+        
     stirswitch = config["experiment_settings"]["stir_settings"]["stir_switch"]
     active_vials = [pvs["vial"] for pvs in config["experiment_settings"]["per_vial_settings"]
                     if pvs["to_run"]]
@@ -239,10 +422,11 @@ else:
                                     col="vial", col_wrap=4,
                                     hue="sensor", kind="line")
                     print(config["experiment_settings"]["operation"])
+                    vials = [vts for vts in config["experiment_settings"]["per_vial_settings"] if vts['to_run']]
                     if config["experiment_settings"]["operation"]["mode"] == "turbidostat":
                         for i, ax in enumerate(g.axes.flatten()):
-                            ax.axhline(config["experiment_settings"]["per_vial_settings"][i]["turbidostat_high"], color="k")
-                            ax.axhline(config["experiment_settings"]["per_vial_settings"][i]["turbidostat_low"], color="r")                        
+                            ax.axhline(vials[i]["turbidostat_high"], color="k")
+                            ax.axhline(vials[i]["turbidostat_low"], color="r")                                            
                     plt.savefig(f"{EXP_NAME}-{plotthis}-linear.png")
                     plt.close()
                     g = sns.relplot(data=_df, x="time",
