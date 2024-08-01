@@ -1002,7 +1002,7 @@ def is_higher_than_setpoint(od, setpoint):
     else:
         return False
     
-def morbidostat(eVOLVER, input_data, vials, elapsed_time):
+def morbidostat_toprak(eVOLVER, input_data, vials, elapsed_time):
     """
     CREATED: 2024-03-29
     COMMENTARY:
@@ -1074,9 +1074,13 @@ def morbidostat(eVOLVER, input_data, vials, elapsed_time):
             firstODvals = np.nanmedian(taildf.OD.tail(10).values)# .nanmedian()
             if np.isnan(firstODvals ):
                 firstODvals = 0
-
+            """
+            First check if the OD vals are within the calibration range.
+            """
             if not np.isnan(lastODvals):
-                # print(x, "here", elapsed_time, (elapsed_time - lastpumptime))
+                """
+                If the time condition is satisfied....
+                """
                 if (elapsed_time - lastpumptime) > settings.interval[x]:
                     #print("exceeded dilution interval")                    
                     # Did we grow since more than the start of the previous dilution?
@@ -1085,7 +1089,10 @@ def morbidostat(eVOLVER, input_data, vials, elapsed_time):
                     ODpath = os.path.join(eVOLVER.exp_dir, settings.exp_name, f'od_{sensor}_raw', file_name)        
                     sensordata = pd.read_csv(ODpath,
                                              sep=",",names=["elapsed_time","od"],
-                                             skiprows=[0])         
+                                             skiprows=[0])
+                    """
+                    ... and there has been net growth AND a threshold crossing, then add stress.
+                    """
 
                     if ((lastODvals > settings.setpoint[x]) and (deltaOD > GROWTHDELTA)):
                         ### Run stress pump - in2
@@ -1096,9 +1103,11 @@ def morbidostat(eVOLVER, input_data, vials, elapsed_time):
                             outfile.write(f"{elapsed_time},{timein},in2\n")                        
                             # elif (deltaOD > GROWTHDELTA):
                     else:
-                        ### Run media pump - in1
+                            
+                        """
+                        ... else dilute with media
+                        """                        
                         MESSAGE[x] = str(round(pump_run_duration[x], 2))
-                        MESSAGE[x + 16] = str(round(pump_run_duration[x]+4, 2))
                         timein = round(pump_run_duration[x],2)                        
                         with open(pumplogs[x], "a+") as outfile:
                             outfile.write(f"{elapsed_time},{timein},in1\n")
@@ -1115,19 +1124,232 @@ def morbidostat(eVOLVER, input_data, vials, elapsed_time):
                 calibration = pd.read_csv(os.path.join(eVOLVER.exp_dir,\
                                                        f"{settings.calib_name}.csv"))
                 beyond_calibration_range = (float(np.median(sensordata.od.tail(10))) < calibration[(calibration.vial == x) & (calibration.sensor == sensor)].reading.min())
+                below_low_calibration = (float(np.median(sensordata.od.tail(10))) > calibration[(calibration.vial == x) & (calibration.sensor == sensor)].reading.max())                
                 #beyond_upper_setpoint = is_higher_than_setpoint(lastODvals, setpoint)
                 #if beyond_upper_setpoint and (x in [0,1,2]):
-                print(x, beyond_calibration_range)
+                print(f"Vial {x}: beyond upper calib: {beyond_calibration_range}, below lower calib: {below_low_calibration}")
+
+                """
+                keep diluting with media, every pump event, until the OD is back in range.
+                """
                 if beyond_calibration_range:
-                    MESSAGE[x + 32] = str(round(pump_run_duration[x], 2))
-                    MESSAGE[x + 16] = str(round(pump_run_duration[x], 2))
-                    timein = round(pump_run_duration[x],2)                        
-                    with open(pumplogs[x], "a+") as outfile:
-                        outfile.write(f"{elapsed_time},{timein},in2\n")
+                    if (elapsed_time - lastpumptime) > 50./3600.:
+                        ### Run media pump - in1
+                        MESSAGE[x + 32] = str(round(pump_run_duration[x], 2))
+                        MESSAGE[x + 16] = str(round(pump_run_duration[x], 2))
+                        timein = round(pump_run_duration[x],2)                        
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in2\n")                                        
+                    # MESSAGE[x] = str(round(pump_run_duration[x], 2))
+
+                    # timein = round(pump_run_duration[x],2)                        
+                    # with open(pumplogs[x], "a+") as outfile:
+                    #     outfile.write(f"{elapsed_time},{timein},in2\n")
+                if below_low_calibration:
+                    """
+                    if very low OD, dilute at regular intervals, giving the vial enough time for growth/recovery
+                    """
+                    if (elapsed_time - lastpumptime) > settings.interval[x]:
+                        ### Run media pump - in1
+                        MESSAGE[x] = str(round(pump_run_duration[x], 2))
+                        timein = round(pump_run_duration[x],2)                        
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in1\n")                    
 
     if MESSAGE != ['--'] * 48:
         eVOLVER.fluid_command(MESSAGE)
 
+def morbidostat(eVOLVER, input_data, vials, elapsed_time):
+    """
+    CREATED: 2024-07-31
+    COMMENTARY:
+    Modification of Toprak et al to ignore OD perturbations. This is in reponse to salinity dependent OD jumps.
+    """
+    OD_data = input_data['transformed']['od']
+    flow_rate = eVOLVER.get_flow_rate()       #read from calibration file
+    MESSAGE = ['--'] * 48
+    pumplogs = [os.path.join(eVOLVER.exp_dir, settings.exp_name,
+                                            "pump_log", f"vial{x}_pump_log.txt")
+                for x in vials]
+
+    ## Dispense 10% of vial volume => 9% of stock stress, and 90.1% OD
+    ## We don't want to balance out the growth. The dilution should be smaller than the growth at each step.
+    ## Implemented: Allow for 10% increase in OD, and dilute down to 5%.
+    ## if growth rate is 0.33, time for 10% increase is log2(1.1)/0.33.
+    ## In this time, dilute it down to 95% of the OD: v = 0.05 v1 = 22*0.05 = 1.1mL
+    # dil_interval = np.log2(1.1)/0.33
+    
+    volume = [0.05*vsleeve for vsleeve, vtr\
+              in zip(settings.volume,
+                     settings.vials_to_run)]
+
+    pump_run_duration = [volume[x]*vtr/flow_rate[x]
+                         if flow_rate[x] != ''\
+                         else 0\
+                         for x, vtr in zip(vials, settings.vials_to_run)]
+
+    ## How much time to allow for mixing before running efflux
+    WAITDURATION = 25./3600 
+    GROWTHDELTA = 1e-4
+    for x in vials:
+        if settings.vials_to_run[x] == 1:
+            file_name =  "vial{0}_OD_autocalib.txt".format(x)
+            OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'OD_autocalib', file_name)
+
+            pump_file_name =  "vial{0}_pump_log.txt".format(x)
+            pump_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, 'pump_log', pump_file_name)
+
+            data =  pd.read_csv(OD_path,sep=",",)
+            pumpdata =  pd.read_csv(pump_path,
+                                    sep=",",
+                                    names=["time","timein","pump"],
+                                    skiprows=[0])
+            pumpdata.loc[pumpdata.pump.isna(), "pump"] = ""
+            """
+            If it has been DURATION minutes since the last pump event, run the efflux pump.
+            At the start of the experiment, 
+            """
+            
+            if (elapsed_time - pumpdata.time.tail(1).values[0]) < WAITDURATION:
+                MESSAGE[x+16] = str(round(pump_run_duration[x]+4, 2))
+            sensor = 135
+            data["OD"] = data[f"od_plinear_{sensor}"]
+
+
+            ############################################################
+            ##### Absolute OD based computatio, from TOPRAK
+            # initialize
+            lastpumptime = 0
+            if pumpdata.shape[0] > 1:
+                lastpumptime = pumpdata.tail(1).time.values[0]
+            # Current OD
+            taildf = data[data.time > (lastpumptime)]
+            lastODvals = np.nanmedian(taildf.OD.tail(10).values)
+            # print(x, lastODvals, taildf.OD.tail(10).values)            
+            # Before the previous dilution
+            taildf = data[data.time <  lastpumptime]            
+            firstODvals = np.nanmedian(taildf.OD.tail(10).values)
+            ############################################################
+            ##### COMMENTARY
+            ## Two problems with the absolute OD logic
+            ## 1. It fails in the salt case because of the salt spike dependent OD increase
+            ## 2. It is meant to the dilution has been perfect.
+            ## [1] above is definitely the important problem to solve, but I hadn't realized
+            ## that [2] is a problem as well until I took a look at the data.
+            ## There are instances where there is _larger_ net growth in a time window, but the
+            ## lower absolute OD obscures this.
+
+            # initialize
+            pumptime = 0
+            prevpumptime = 0
+            OFFSET_OBS = 30 ## 10 minutes            
+            if pumpdata.shape[0] > 1:
+                """
+                Compute if there has been net growth since the previous window
+                """
+                pumptime = pumpdata.tail(1).time.values[0]
+                prevpumptime = pumpdata.tail(2).time.values[0]
+                thiswindow = data[data.time > pumptime]
+                prevwindow = data[(data.time < pumptime) & (data.time > prevpumptime)]
+                if prevwindow.shape[0] > 0:
+                    netgrowth_prevwindow = prevwindow.tail(20).OD.median() - prevwindow.head(OFFSET_OBS).tail(20).OD.median()
+                else:
+                    netgrowth_prevwindow = 0
+
+                netgrowth_thiswindow = thiswindow.tail(20).OD.median() - thiswindow.head(OFFSET_OBS).tail(20).OD.median() 
+                deltaGrowth = netgrowth_thiswindow - netgrowth_prewindow
+            else:
+                """
+                Initially, deltagrowth is initialized to 0.
+                """
+                deltaGrowth = 0
+                
+            ############################################################
+            
+            if np.isnan(firstODvals ):
+                firstODvals = 0
+            """
+            First check if the OD vals are within the calibration range.
+            """
+            if not np.isnan(lastODvals):
+                """
+                If the time condition is satisfied....
+                """
+                if (elapsed_time - lastpumptime) > settings.interval[x]:
+
+                    deltaOD = lastODvals - firstODvals
+                    file_name =  f"vial{x}_od_{sensor}_raw.txt"
+                    ODpath = os.path.join(eVOLVER.exp_dir, settings.exp_name, f'od_{sensor}_raw', file_name)        
+                    sensordata = pd.read_csv(ODpath,
+                                             sep=",",names=["elapsed_time","od"],
+                                             skiprows=[0])
+                    """
+                    ... and there has been net growth AND a threshold crossing, then add stress.
+                    """
+
+                    if ((lastODvals > settings.setpoint[x]) and (deltaGrowth > GROWTHDELTA)):
+                        ### Run stress pump - in2
+                        MESSAGE[x + 32] = str(round(pump_run_duration[x], 2))
+                        timein = round(pump_run_duration[x],2)
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in2\n")                        
+                    else:
+                            
+                        """
+                        ... else dilute with media
+                        """                        
+                        MESSAGE[x] = str(round(pump_run_duration[x], 2))
+                        timein = round(pump_run_duration[x],2)                        
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in1\n")
+            else:
+                """
+                Keep diluting
+                """
+                file_name =  f"vial{x}_od_{sensor}_raw.txt"
+                OD_path = os.path.join(eVOLVER.exp_dir, settings.exp_name, f'od_{sensor}_raw', file_name)        
+                sensordata = pd.read_csv(OD_path,
+                                         sep=",",names=["elapsed_time","od"],
+                                        skiprows=[0])
+
+                calibration = pd.read_csv(os.path.join(eVOLVER.exp_dir,\
+                                                       f"{settings.calib_name}.csv"))
+                beyond_calibration_range = (float(np.median(sensordata.od.tail(10))) < calibration[(calibration.vial == x) & (calibration.sensor == sensor)].reading.min())
+                below_low_calibration = (float(np.median(sensordata.od.tail(10))) > calibration[(calibration.vial == x) & (calibration.sensor == sensor)].reading.max())                
+                #beyond_upper_setpoint = is_higher_than_setpoint(lastODvals, setpoint)
+                #if beyond_upper_setpoint and (x in [0,1,2]):
+                print(f"Vial {x}: beyond upper calib: {beyond_calibration_range}, below lower calib: {below_low_calibration}")
+
+                """
+                keep diluting with media, every pump event, until the OD is back in range.
+                """
+                if beyond_calibration_range:
+                    if (elapsed_time - lastpumptime) > 50./3600.:
+                        ### Run media pump - in1
+                        MESSAGE[x + 32] = str(round(pump_run_duration[x], 2))
+                        MESSAGE[x + 16] = str(round(pump_run_duration[x], 2))
+                        timein = round(pump_run_duration[x],2)                        
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in2\n")                                        
+                    # MESSAGE[x] = str(round(pump_run_duration[x], 2))
+
+                    # timein = round(pump_run_duration[x],2)                        
+                    # with open(pumplogs[x], "a+") as outfile:
+                    #     outfile.write(f"{elapsed_time},{timein},in2\n")
+                if below_low_calibration:
+                    """
+                    if very low OD, dilute at regular intervals, giving the vial enough time for growth/recovery
+                    """
+                    if (elapsed_time - lastpumptime) > settings.interval[x]:
+                        ### Run media pump - in1
+                        MESSAGE[x] = str(round(pump_run_duration[x], 2))
+                        timein = round(pump_run_duration[x],2)                        
+                        with open(pumplogs[x], "a+") as outfile:
+                            outfile.write(f"{elapsed_time},{timein},in1\n")                    
+
+    if MESSAGE != ['--'] * 48:
+        eVOLVER.fluid_command(MESSAGE)
+        
 if __name__ == '__main__':
     print('Please run eVOLVER.py instead')
     logger.info('Please run eVOLVER.py instead')
