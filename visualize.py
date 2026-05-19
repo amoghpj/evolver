@@ -43,7 +43,7 @@ ipdict = {"spongebob":"192.168.1.3",
           "gary":"192.168.1.6",
           "patrick":"192.168.1.4",
           "sandy":"192.168.1.5",
-          "plankton":"192.168.1.14",
+          "plankton":"192.168.1.12",
           "mermaidman":"169.254.51.129",
           "barnacleboy":"192.168.1.9",              
           "krabs":"169.254.6.231",
@@ -180,7 +180,15 @@ if __name__ == '__main__':
                 .get("per_vial_settings", []):
                 viallist.append(pvc)
             df = pd.DataFrame(viallist)
-            allcolumns = ["morbidostat_setpoint", "doubling_time","turbidostat_low","turbidostat_high","chemo_start_od","chemo_start_time","chemo_rate_2"]
+            allcolumns = ["morbidostat_setpoint",
+                          "doubling_time",
+                          "turbidostat_low",
+                          "turbidostat_high",
+                          "input_pump2"
+                          "chemo_start_od",
+                          "chemo_start_time",
+                          "chemo_rate_2"
+                          ]
             for col in allcolumns:
                 if col not in df.columns:
                     df[col] = np.nan
@@ -200,7 +208,12 @@ if __name__ == '__main__':
         elif operation == "growthcurve":
             df = df[["vial","to_run","volume","calib_initial_od", "calib_end_od","description"]]                
         elif operation == "morbidostat":
-            df = df[["vial","to_run","volume","morbidostat_setpoint","doubling_time","calib_initial_od","calib_end_od","description"]]
+            df = df[["vial","to_run","volume",
+                     "morbidostat_setpoint",
+                     "doubling_time",
+                     "input_pump2",
+                     "calib_initial_od","calib_end_od",
+                     "description"]]
         elif operation == "turbidostat":
             df = df[["vial","to_run","volume","turbidostat_low","turbidostat_high","calib_initial_od","calib_end_od","description"]]
         elif operation == "chemostat":
@@ -251,7 +264,7 @@ if __name__ == '__main__':
                          "-OD_autocalib-linear",
                          "-growthrate_fromOD",
                          "-OD_autocalib",
-                         "-temp","-morbidostat","-salt"]:
+                         "-temp","-morbidostat"]:
                 st.header(suff[1:])
                 if os.path.exists(f"{page}{suff}.png"):
                     st.image(Image.open(f"{page}{suff}.png"))
