@@ -160,8 +160,8 @@ if __name__ == '__main__':
             st.header("Mode specific settings")
             with st.expander("Calibration settings"):
                 num_pump_events = st.number_input("Number of calibration steps",20)
-            # with st.expander("Chemostat settings"):
-            #     chemoset = st.number_input("Chemo set")
+            with st.expander("Chemostat settings"):
+                chemoset = st.number_input("Chemo set")
             with st.expander("Turbidostat settings"):
                 turbset = st.number_input("turbo_set")
             st.form_submit_button()
@@ -184,10 +184,13 @@ if __name__ == '__main__':
                           "doubling_time",
                           "turbidostat_low",
                           "turbidostat_high",
-                          "input_pump2"
+                          "input_pump2",
+                          "chemo_rate",
                           "chemo_start_od",
                           "chemo_start_time",
-                          "chemo_rate_2"
+                          "calib_initial_od",
+                          "calib_end_od",
+                          "chemo_rate_2",
                           ]
             for col in allcolumns:
                 if col not in df.columns:
@@ -199,8 +202,9 @@ if __name__ == '__main__':
                  "turbidostat_low":0.,"turbidostat_high":0.,
                  "chemo_start_od":0.0, "chemo_start_time":0.0,
                  "chemo_rate":0.0,
-                 "morbidostat_setpoint":0,"doubling_time":0,"description":"",
-                 "chemo_rate_2":0.0}
+                 "morbidostat_setpoint":0,
+                 "doubling_time":0,"description":"",
+                "chemo_rate_2":0.0}
                 for vial in range(16)])
 
         if operation == "calibration":
@@ -256,15 +260,12 @@ if __name__ == '__main__':
             curves = f"{page}-curves.png"
             st.image(curves)
         except:
-            for suff in ["-od_135_raw",
-                         "-od_90_raw",
-                         "-OD",
-                         "_projection",                         
-                         "-OD_autocalib",
-                         "-OD_autocalib-linear",
-                         "-growthrate_fromOD",
-                         "-OD_autocalib",
-                         "-temp","-morbidostat"]:
+            for suff in ["-morbidostat",
+                         "-od_135_raw",
+                         # "-od_90_raw",
+                         # "-OD",
+                         "-projection",                         
+                         "-od_plinear_135"]:
                 st.header(suff[1:])
                 if os.path.exists(f"{page}{suff}.png"):
                     st.image(Image.open(f"{page}{suff}.png"))
