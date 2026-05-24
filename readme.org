@@ -1,4 +1,14 @@
-* Experiment setup instructions
+* About
+This is a wrapper around the official [[https://github.com/FYNCH-BIO/dpu/tree/master]['dpu']] code that runs the eVOLVER platform. Use the contents of this repository instead of the template provided in the official repo.
+
+NOTE: This readme contains internal instructions to setup and run a typical eVOLVER experiment. This can be directly applicable to your setup if you run your eVOLVER scripts out of =~/Documents/dpu/experiment/=. If not, please modify the file paths accordingly.
+
+** Requirements
+   Apart from the instructions for a standard eVOLVER setup (see  https://khalil-lab.gitbook.io/evolver/getting-started/software-installation/dpu-installation), this wrapper requires the =streamlit= package which drives the front end for easy, custom experiment definition. 
+** Setup 
+Copy this repo
+
+* Experiment setup instructions (INTERNAL USE ONLY, USE WITH CAUTION)
 1. Autoclave vials with lids on.
    1. For "open" vials, it is not necessary to autoclave the needles.
 2. Clean lines with sterile water (20s), and 70% ethanol (20s).
@@ -14,10 +24,12 @@ Setting up the experiment:
 4. Duplicate the =evolver/= folder, and name the duplicate with a descriptive name.
    Typically =YYYY_MM_DD_keywords_separted_by_underscore=.
 5. Switch back to the terminal window and type in =cd ~/Documents/dpu/experiment/NAME_OF_YOUR_NEW_DIRECTORY=
-6. Start the visual interface to populate the configuration file by
-   typing in =streamlit run visualize.py=.  This will return a
-   localhost IP address with a port. Copy and paste this in a browser
-   window.
+6. Start the visual interface to populate the configuration file.
+   #+begin_src 
+bash monitor.sh
+   #+end_src
+   This will return open a browser tab with the streamlit interface to
+   populate the configuration file.
 7. Populate all the fields, and press 'Write to configuration
    file'. NOTE: If you are running a calibration, or if you are not planning
    on using a calibration file, LEAVE THE "Calibration name" field
@@ -45,13 +57,19 @@ Setting up the experiment:
       automatically renamed and time stamped.
    6. Open a new terminal, load bash, navigate to the experiment
       directory as in STEP 5.
-   7. Type in =python write_calibration_to_file.py=. This will create
-      a CSV file with the name of the calibration experiment, the same
+   7. Create the calibration file
+      #+begin_src bash
+python write_calibration_to_file.py
+      #+end_src
+      This will create  a CSV file with the name of the calibration experiment, the same
       as the experiment name.
    8. Next, switch back to the browser and type in the name of this calibration. The real experiment will need to have a different name.
 10. When the experiment config file is filled, switch to the terminal
     and in a new tab (load bash and navigate to the experiment
-    direcotory), type in =python eVOLVER.py=
+    direcotory)
+    #+begin_src bash
+python eVOLVER.py
+    #+end_src
 11. Sanity check the experiment settings, press =n= when prompted for
     blanking the vials, and the experiment should start.
 12. When the experiment is running, a new drop down option should be
